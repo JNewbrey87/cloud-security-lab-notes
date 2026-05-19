@@ -26,7 +26,10 @@ This write-up documents what I actually did and why it matters technically; not 
 ## What I Built and Managed
 ### Linux Server Administration
 Deployed and administered a Linux-based dedicated server entirely through the command line; no graphical interface, no hand-holding. Day-to-day operations included:
-- Installing, updating, and managing the Ark dedicated server runtime via CLI- Installing and maintaining security software through the command line- Monitoring server health and managing the process lifecycle manually- Planning and executing updates without taking active players offline (eventually; see **Operational Challenges** below)
+- Installing, updating, and managing the Ark dedicated server runtime via CLI
+- Installing and maintaining security software through the command line
+- Monitoring server health and managing the process lifecycle manually
+- Planning and executing updates without taking active players offline (eventually; see **Operational Challenges** below)
 ---
 ### Configuration Management
 Ark's dedicated server is almost entirely governed by `.ini` configuration files. I authored and maintained an extensive set of custom configs that controlled nearly every behavioral parameter of the server environment:
@@ -58,13 +61,24 @@ The pattern, staging environment, stakeholder-involved testing, and production d
 ---
 ### High Availability Design: Load Balancing Across Two Servers
 When the player base crossed 100 concurrent users, single-server maintenance became a real problem; taking the primary offline for updates meant full service interruption during peak hours. The solution:
-- Stood up a second dedicated Linux server on the same hosting platform- Configured the backup server as an overflow and maintenance target- During update windows, shifted active players to the backup server- Applied patches and updates to the primary with no interruption to active sessions- Reversed the configuration once the primary was back online and verified
+- Stood up a second dedicated Linux server, from copies of the main server, on a spare laptop alongside the staging/QC environment setup for User Acceptance Testing
+- Configured the backup server as an overflow and maintenance target
+- During update windows, the server state was saved to the backup server and players shifted to that backup
+- Applied patches and updates to the primary with no interruption to active sessions existing on the backup,
+- Brought the main server back up and load-balanced player sessions back to the updated server (total downtime for players during this move was 15 to 30 minutes on the high end)
+- Applied the new server configs to the backup server only during the next patching window: approx. 48-hours prior to each new patch update.
+  - This practice allowed for emergency backups to the server state that were never more than a week old.
+  
 This was not enterprise load balancing with automated failover; it was manual, deliberate, and effective. The underlying principle, which is maintaining service continuity by decoupling the update process from the live environment, is the same one that shows up in rolling deployments and blue/green infrastructure patterns today.
 
 ---
 ### Community Support and Incident Response
 The community side of this project was closer to a support queue than a gaming group. Responsibilities included:
-- Triaging and resolving player-reported issues: bugs, configuration conflicts, access problems, and rules disputes- Maintaining server rules and enforcement documentation- Managing the community communication channel- Writing and publishing how-to guides to reduce repeat support requests; the same logic behind a knowledge base
+- Triaging and resolving player-reported issues: bugs, configuration conflicts, access problems, and rules disputes
+- Maintaining server rules and enforcement documentation
+- Managing the community communication channel
+- Writing and publishing how-to guides to reduce repeat support requests; the same logic behind a knowledge base
+  
 The volume of support requests grew significant enough that my YouTube content shifted from let's-play footage to tutorial and how-to content. I could not maintain a continuous gameplay series because server management and community support had become the primary workload. In hindsight, that shift in priority was the first clear signal of where my interests actually sat.
 
 ---
@@ -76,9 +90,12 @@ The lesson was not "do not break things." The lesson was that a fast, documented
 
 ---
 ### Configuration Complexity at Scale
-The `.ini` configuration surface for Ark is expansive; hundreds of tunable parameters with interdependencies that are not always documented. Early misconfigurations cascaded in unexpected ways: adjusting one growth rate would interact with a spawn rate setting and produce unintended gameplay outcomes that players would immediately report.
+The `.ini` configuration surface for Ark is expansive; hundreds of tunable parameters with interdependencies that are not always documented. Early misconfigurations cascaded in unexpected ways: adjusting one growth rate would interact with a spawn rate setting and produce unintended gameplay outcomes that players would immediately report. 
+
 Managing this at scale meant developing a consistent practice:
-- Document every change before applying it- Test behavioral impact before publishing to active players- Maintain a known-good configuration baseline for rollback
+- Document every change before applying it
+- Test behavioral impact before publishing to active players
+- Maintain a known-good configuration baseline for rollback
 
 ---
 ## What This Translates To
