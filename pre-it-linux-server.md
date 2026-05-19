@@ -1,4 +1,5 @@
-# Ark: Survival Evolved - Dedicated Server Administration### Retrospective Project Write-Up | Late 2015 - Late 2017 | Pre-IT Career
+# Ark: Survival Evolved - Dedicated Server Administration
+### Retrospective Project Write-Up | Late 2015 - Late 2017 | Pre-IT Career
 ---
 > *"I started this to have a place to record YouTube content. I ended up spending more time configuring the server than playing the game, and realized that was fine with me."*
 ---
