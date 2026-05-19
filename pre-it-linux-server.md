@@ -100,4 +100,4 @@ I did not know it was called systems administration. I did not know the configur
 That instinct turned out to be directionally correct. Everything that came after, including DoD contracts, federal infrastructure work, and regulated banking environments, built on a foundation that started here; in a Linux terminal, trying to figure out why 100 players could not connect to a dinosaur game.
 
 ---
-*Part of the [`cloud-security-lab-notes`](https://github.com/JNewbrey87/cloud-security-lab-notes) retrospective collection.**Joshua E. Newbrey | [linkedin.com/in/jnewbrey87](https://www.linkedin.com/in/jnewbrey87)* 
+*Part of the [`cloud-security-lab-notes`](https://github.com/JNewbrey87/cloud-security-lab-notes) retrospective collection. Joshua E. Newbrey | [linkedin.com/in/jnewbrey87](https://www.linkedin.com/in/jnewbrey87)* 
