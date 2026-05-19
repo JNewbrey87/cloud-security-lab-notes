@@ -2,12 +2,12 @@
 ---
 > *"I started this to have a place to record YouTube content. I ended up spending more time configuring the server than playing the game, and realized that was fine with me."*
 ---
-## Overview
+### Overview 
 Before I ever held an IT job title, I was running a Linux-based dedicated game server for **Ark: Survival Evolved** during its Alpha development period. What started as a content creation side project turned into hands-on experience in server administration, configuration management, operational continuity, and community support; none of which I was formally trained to do at the time.
 I learned by breaking things, Googling the error messages, and fixing what broke. Then I broke something else and repeated the process. By the time the project wound down in 2017, I had scaled the community from 5 players to over 100, stood up a second server to handle load during maintenance windows, and was fielding a consistent queue of user-reported issues that looked more like a ticket backlog than a gaming hobby.
 This write-up documents what I actually did and why it matters technically; not what it felt like at the time.
 ---
-## Environment
+### Environment
 | Component | Details ||---|---|| **Platform** | Ark: Survival Evolved Dedicated Server (Alpha era) || **OS** | Linux (no GUI; 100% command-line) || **Hosting** | Third-party VM provider (web-based control panel, older virtualization stack) || **Access method** | CLI only; no desktop environment || **Community size** | Scaled from 5 to 100+ concurrent players || **Timeline** | Late 2015 to Late 2017 |
 ---
 ## What I Built and Managed
