@@ -34,7 +34,7 @@ This write-up documents what I actually did and why it matters technically; not 
 
 ### Linux Server Administration
 
-Deployed and administered a Linux-based dedicated server entirely through the command line; no graphical interface, no hand-holding. Day-to-day operations included:
+I deployed and administered a Linux-based dedicated server entirely through the command line; no graphical interface, no hand-holding. Day-to-day operations included:
 
 - Installing, updating, and managing the Ark dedicated server runtime via CLI
 - Installing and maintaining security software through the command line
@@ -70,11 +70,11 @@ Custom parameters included player stat scaling, creature taming speeds, resource
 
 ### Staging Environment and User Acceptance Testing
 
-Before pushing any configuration change to the live server, I maintained a controlled test environment separate from production. When players suggested configuration changes, I would implement the change on my personal gaming PC and spin up a password-protected local Ark session with a capped player count, then invite the suggesting player to test the result directly; putting them inside the change before it ever touched production.
+Before pushing any configuration change to the live server, I maintained a controlled test environment separate from production. When players suggested configuration changes, I'd implement the change on my personal gaming PC and spin up a password-protected local Ark session with a capped player count, then invite the suggesting player to test the result directly; putting them inside the change before it ever touched production.
 
 This gave every proposed change a real validation step and kept players invested in the outcome of their own suggestions. If something broke in testing, it broke for one person in a controlled environment rather than for the entire server. If it worked, the player who suggested it became the first advocate for the change when it rolled out to everyone else.
 
-The pattern, staging environment, stakeholder-involved testing, and production deployment only after sign-off, is the same one used in formal change management processes today.
+The pattern (staging environment, stakeholder-involved testing, production deployment only after sign-off) is the same one used in formal change management processes today. I just didn't have a name for it yet.
 
 ---
 
@@ -119,7 +119,7 @@ The volume of support requests grew significant enough that my YouTube content s
 
 ### The Outage
 
-Early in the project, before I understood the system well enough to prevent it, I caused a week-long outage. The original five players left to never return.
+Early in the project, before I understood the system well enough to prevent it, I caused a week-long outage. The original five players left and never came back.
 
 The recovery process forced me to actually understand the system rather than just operate it. What had been trial-and-error became deliberate troubleshooting: identifying root cause, documenting what went wrong, and building a working model of how the pieces connected. The community rebuilt from zero and grew larger than it had been before the outage.
 
