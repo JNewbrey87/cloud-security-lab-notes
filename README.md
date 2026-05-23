@@ -13,13 +13,16 @@ Kusto Query Language queries I've written for Microsoft Sentinel, covering threa
 Custom detection rules and alert configurations developed during SC-200 prep. I try to document the logic behind each rule, not just the syntax.
 
 ### Azure Policy Definitions
-Policy-as-code artifacts for governance, compliance enforcement, and configuration management in Azure environments. Part of building toward AZ-500 and a longer-term interest in treating compliance as an engineering problem rather than a checkbox exercise.
+Policy-as-code artifacts for governance, compliance enforcement, and configuration management in Azure environments. Part of the AZ-500 cert work and a longer-term interest in treating compliance as an engineering problem rather than a checkbox exercise.
 
 ### GRC Toolkit Labs
 Hands-on gap assessment work using the [GRC Engineering Club toolkit](https://github.com/GRCEngClub/claude-grc-engineering), starting with a SOC2 and GLBA assessment against my own GitHub repositories. This lab series is foundational work toward auditing IaC-defined Azure environments as the lab builds out.
 
 ### Lab Notes
 Structured notes from SC-200, AZ-500, and CySA+ study covering key concepts, things that tripped me up, and practical application. Less polished than the other sections; more honest.
+
+### Retrospective Write-Ups
+Documented case studies from earlier in my career, translated into technical write-ups that map what I actually did to modern security concepts. Current entries cover Linux server administration and staging environments (2015-2017) and a phishing triage methodology developed from a live FAA incident (~2020). These aren't certifications or lab simulations; they're the work that preceded the formal path.
 
 ## Cert Pipeline
 
