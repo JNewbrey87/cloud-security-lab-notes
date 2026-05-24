@@ -210,4 +210,4 @@ The full pipeline was confirmed: Windows Security log, Wazuh agent, internal swi
 
 ---
 
-*Part of the [azure-security-homelab](https://github.com/JNewbrey87/azure-security-homelab) portfolio, building toward Cloud Security Analyst and SC-200/CySA+/AZ-500 certifications.*
+*Part of [cloud-security-lab-notes](https://github.com/JNewbrey87/cloud-security-lab-notes) | Joshua E. Newbrey | [LinkedIn](https://www.linkedin.com/in/jnewbrey87/) | [GitHub Profile](https://github.com/JNewbrey87).*
