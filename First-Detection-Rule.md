@@ -193,16 +193,6 @@ The full pipeline was confirmed: Windows Security log, Wazuh agent, internal swi
 
 ---
 
-## Files
-
-| File | Description |
-|------|-------------|
-| `local_rules.xml` | Custom Wazuh detection rules (rule 100002) |
-| `agent_install.ps1` | PowerShell script: agent download, silent install, enrollment |
-| `network_setup.ps1` | PowerShell script: internal switch adapter and static IP assignment |
-
----
-
 ## Up Next
 
 - **Lab 1 Extension:** SSH brute force detection using the Kali attacker VM; Hydra against the Ubuntu manager SSH service; custom Wazuh detection rule.
