@@ -10,6 +10,9 @@ This is my working archive of hands-on lab output, study notes, and reusable art
 Kusto Query Language queries I've written for Microsoft Sentinel, covering threat detection, log analysis, and security monitoring use cases. These come out of SC-200 study and actual lab sessions in Sentinel.
 
 ### Sentinel Analytic Rules
+Custom detection rules and alert configurations for Microsoft Sentinel, developed during SC-200 prep. Logic behind each rule is documented, not just the syntax.
+
+### Wazuh Detection Rules
 Custom detection rules written in Wazuh's XML rule syntax, targeting Windows and Linux security events. Rules are MITRE ATT&CK mapped and documented with design rationale, not just syntax. Current coverage: T1110 (Brute Force / Event ID 4625).
 
 ### Azure Policy Definitions
