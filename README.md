@@ -32,9 +32,9 @@ Documented case studies from earlier in my career, translated into technical wri
 | Certification | Status |
 |---|---|
 | CompTIA Security+ | Active (through 2027) |
-| SC-200 (Microsoft Security Operations Analyst) | In Progress |
-| CySA+ | Beginning August 2026 |
-| AZ-500 (Microsoft Azure Security Engineer) | In Progress |
+| SC-200 (Microsoft Security Operations Analyst) | Future Track |
+| CySA+ | Actively Studying |
+| SC-500 (Microsoft Security Operations) | Future Track |
 
 ## A Note on Usage
 
