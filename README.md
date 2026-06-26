@@ -2,45 +2,40 @@
 
 ## Overview
 
-This is my working archive of hands-on lab output, study notes, and reusable artifacts from building cloud security depth in Microsoft Azure. I add to it continuously as cert work and practical lab sessions accumulate. The goal is a portfolio that shows work in progress, not just finished products; if something is here, I built it or wrote it myself.
+This is my working archive of hands-on lab output, AEGIS research runs, and retrospective write-ups documenting the technical work that led here. I add to it continuously as lab sessions complete. The goal is a portfolio that shows work in progress, not just finished products; if something is here, I built it or wrote it myself.
 
-## What's in Here
+## P1: Wazuh SIEM Detection Lab
 
-### KQL Queries
-Kusto Query Language queries I've written for Microsoft Sentinel, covering threat detection, log analysis, and security monitoring use cases. These come out of SC-200 study and actual lab sessions in Sentinel.
+Sequential detection engineering labs building toward a fully instrumented Active Directory environment with validated MITRE ATT&CK coverage.
 
-### Sentinel Analytic Rules
-Custom detection rules and alert configurations for Microsoft Sentinel, developed during SC-200 prep. Logic behind each rule is documented, not just the syntax.
+| File | Lab | MITRE |
+|------|-----|-------|
+| [00-LAB-P1-1a.md](00-LAB-P1-1a.md) | Wazuh Agent Deployment + First Detection Rule (Event 4625, Rule 100002) | T1110 |
+| [00-LAB-P1-1b.md](00-LAB-P1-1b.md) | SSH Brute Force Detection — Kali + Hydra + Rule 100003 | T1110, T1110.001 |
+| [00-LAB-P1-1c.md](00-LAB-P1-1c.md) | Tiered AD Lab — Domain Forest Build + Rule 100002 Validation | T1110, T1070.006 |
+| [00-LAB-P1-1d.md](00-LAB-P1-1d.md) | Lateral Movement Detection — Rules 100004 + 100005, Two-Stage Kill Chain | T1021.002 |
 
-### Wazuh Detection Rules
-Custom detection rules written in Wazuh's XML rule syntax, targeting Windows and Linux security events. Rules are MITRE ATT&CK mapped and documented with design rationale, not just syntax. Current coverage: T1110 (Brute Force / Event ID 4625).
+Phase 2 (Azure Arc, Sentinel, KQL detection engineering) begins August 2026.
 
-### Azure Policy Definitions
-Policy-as-code artifacts for governance, compliance enforcement, and configuration management in Azure environments. Part of the AZ-500 cert work and a longer-term interest in treating compliance as an engineering problem rather than a checkbox exercise.
+## AEGIS Research
 
-### GRC Toolkit Labs
-Hands-on gap assessment work using the [GRC Engineering Club toolkit](https://github.com/GRCEngClub/claude-grc-engineering), starting with a SOC2 and GLBA assessment against my own GitHub repositories. This lab series is foundational work toward auditing IaC-defined Azure environments as the lab builds out.
+Local AI Red/Blue Team simulation running on-device via CrewAI and Ollama. No cloud API, no data exfiltration. Documents how model scale affects security reasoning quality across adversarial simulation runs.
 
-### Lab Notes
-Structured notes from SC-200, AZ-500, and CySA+ study covering key concepts, things that tripped me up, and practical application. Less polished than the other sections; more honest.
+| File | Run |
+|------|-----|
+| [aegis/AEGIS-PoC-70b.md](aegis/AEGIS-PoC-70b.md) | Run 2: llama3.3:70b Adversarial Simulation |
 
-### Retrospective Write-Ups
-Documented case studies from earlier in my career, translated into technical write-ups that map what I actually did to modern security concepts. Current entries cover Linux server administration and staging environments (2015-2017) and a phishing triage methodology developed from a live FAA incident (~2020). These aren't certifications or lab simulations; they're the work that preceded the formal path.
+## GRC
 
-## Cert Pipeline
+| File | Description |
+|------|-------------|
+| [GRC-Toolkit-Lab.md](GRC-Toolkit-Lab.md) | SOC 2 + GLBA Gap Assessment using the GRC Engineering Club toolkit |
 
-| Certification | Status |
-|---|---|
-| CompTIA Security+ | Active (through 2027) |
-| SC-200 (Microsoft Security Operations Analyst) | Future Track |
-| CySA+ | Actively Studying |
-| SC-500 (Microsoft Security Operations) | Future Track |
+## Retrospectives
 
-## A Note on Usage
+Write-ups documenting earlier technical work that shaped the path into security.
 
-Everything here reflects personal study and lab work. Nothing contains employer-specific data or proprietary information. Queries and rules are written for educational and portfolio purposes; if something's useful to you, take it.
-
-## Author
-
-**Joshua E. Newbrey**  
-[LinkedIn](https://www.linkedin.com/in/jnewbrey87/) | [GitHub Profile](https://github.com/JNewbrey87)
+| File | Project |
+|------|---------|
+| [retrospective/Help-Desk-Phishing-Triage.md](retrospective/Help-Desk-Phishing-Triage.md) | Phishing Triage Methodology: FAA Help Desk (~2020) |
+| [retrospective/pre-it-linux-server.md](retrospective/pre-it-linux-server.md) | Ark: Survival Evolved Dedicated Server Administration (2015-2017) |
