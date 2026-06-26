@@ -147,8 +147,9 @@ Rule 100003 continued firing with each subsequent set of five attempts.
 
 ## Up Next
 
-- **P1 Add-On:** Sysmon for Linux on the Wazuh manager VM — enhances process, network, and file event telemetry.
-- **Lab 2:** Microsoft Sentinel + KQL Detection Engineering; Azure free tenant, Log Analytics Workspace, first analytic rule.
+- **Lab 1c:** Tiered AD environment — lab.local forest, Tier 0 DC, Tier 1 jump box, and rule 100002 on a domain-joined host. See [00-LAB-P1-1c.md](00-LAB-P1-1c.md).
+- **Lab 1d:** Two-stage kill chain — brute force escalating to lateral movement, detected by rules 100004 + 100005. See [00-LAB-P1-1d.md](00-LAB-P1-1d.md).
+- **Phase 2:** Azure Arc, Microsoft Sentinel, and KQL detection engineering. Begins August 2026.
 
 ---
 
