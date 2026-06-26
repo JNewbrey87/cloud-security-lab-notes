@@ -1,7 +1,7 @@
 # Tiered AD Lab — Domain Forest Build + Windows Failed Logon Detection (Rule 100002)
 
 **Project:** P1 — Wazuh SIEM Home Lab
-**Phase:** 1e wrap-up / Phase 2 prep | **Platform:** Hyper-V on Windows 11 Pro
+**Phase:** 1e wrap-up / Phase 2 prep | **Platform:** VirtualBox on Windows 11 Pro
 **MITRE ATT&CK:** T1110 — Brute Force (primary); T1070.006 / T1562 — Indicator Removal / Impair Defenses (bonus finding)
 **Cert Alignment:** CySA+ CS0-003, SC-200, SC-500
 **Date Completed:** June 2026
@@ -149,7 +149,7 @@ During the session, a manual clock change on the jump box was caught automatical
 
 | Component | Details |
 |-----------|---------|
-| Host | Windows 11 Pro, Hyper-V enabled |
+| Host | Windows 11 Pro, VirtualBox |
 | SIEM Manager | Ubuntu 22.04 LTS, Wazuh v4.14.5 |
 | Domain Controller (Tier 0) | Windows Server 2022, AD DS + DNS, `lab.local` forest, console-only |
 | Jump Box (Tier 1) | Windows Server 2025, domain-joined, RDP + SMB share, Wazuh agent v4.14.5 |
