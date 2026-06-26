@@ -159,8 +159,8 @@ During the session, a manual clock change on the jump box was caught automatical
 
 ## Up Next
 
-- **Two-stage attack scenario:** RDP brute force against the Tier 1 jump box (triggers rule 100002) followed by a simulated lateral-movement attempt toward the Tier 0 domain controller, which will need a new detection rule.
-- **Azure integration:** Free tenant signup and Azure Arc onboarding for the jump box, extending this lab's telemetry into Microsoft Sentinel for Phase 2 (KQL detection engineering).
+- **Lab 1d:** Two-stage kill chain — brute force on the jump box escalating to lateral movement toward the Tier 0 DC, detected by rules 100004 and 100005. See [00-LAB-P1-1d.md](../00-LAB-P1-1d.md).
+- **Phase 2:** Azure Arc onboarding for the jump box, Microsoft Sentinel integration, and KQL detection engineering. Begins August 2026.
 
 ---
 
