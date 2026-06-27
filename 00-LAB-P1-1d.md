@@ -381,8 +381,8 @@ sudo awk '/\(LAB-WSJP-25\) any->EventChannel/{getline; print}' \
 
 ## Up Next
 
-- **Rule 100005 live validation:** Re-run the two-stage attack with `--line-buffered` monitoring active to confirm real-time DC-side detection against logon type 3 events.
-- **Phase 2 — Azure Integration:** Onboard the jump box to Azure Arc and begin Microsoft Sentinel integration; KQL detection engineering for the same kill chain observed here.
+- **Lab 2a:** Azure Arc onboarding for all three lab machines and MCSB baseline assessment via Azure Policy. Rule 100005 validated this same session (DC-side logon type 3, NTLM fallback confirmed). See [00-LAB-P2-1a.md](00-LAB-P2-1a.md).
+- **Phase 2 — Microsoft Sentinel:** Log Analytics Workspace, Windows Security Events data connector, and KQL detection rules mirroring the Phase 1 kill chain. See `00-LAB-P2-1b.md`.
 - **Expanded attack narrative:** Post-exploitation on the DC (privilege escalation, LSASS dump simulation, new detection rules).
 
 ---
