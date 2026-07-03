@@ -10,7 +10,7 @@
 
 ## Objective
 
-This lab is foundational work in a broader series. I ran the github-inspector assessment here first to get comfortable with the toolkit's architecture, invocation method, and output format before applying it to more complex environments; specifically, the Hyper-V lab sessions on the home build and the Azure tenant I'm standing up for AZ-500 and SC-200 prep. Getting the toolchain functional and documented at a simpler scope first means less friction in later labs where the configuration surface is significantly larger.
+This lab is foundational work in a broader series. I ran the github-inspector assessment here first to get comfortable with the toolkit's architecture, invocation method, and output format before applying it to more complex environments; specifically, the Hyper-V lab sessions on the home build and the Azure tenant I'm standing up for SC-500 and SC-200 prep. Getting the toolchain functional and documented at a simpler scope first means less friction in later labs where the configuration surface is significantly larger.
 
 Beyond the setup value, I wanted a real findings artifact tied to frameworks I work with daily. I work in a GLBA and PCI-DSS regulated banking environment, so running a gap assessment against those frameworks against my own GitHub repos isn't a synthetic exercise; it's applying a compliance lens to actual public-facing work. The goal was to establish hands-on familiarity with automated GRC tooling, produce a genuine findings artifact, and identify remediation actions I can actually close.
 
