@@ -15,17 +15,18 @@ Sequential detection engineering labs building toward a fully instrumented Activ
 | [00-LAB-P1-1c.md](00-LAB-P1-1c.md) | Tiered AD Lab — Domain Forest Build + Rule 100002 Validation | T1110, T1070.006 |
 | [00-LAB-P1-1d.md](00-LAB-P1-1d.md) | Lateral Movement Detection — Rules 100004 + 100005, Two-Stage Kill Chain | T1021.002 |
 
-Custom detection rules for all four labs are deployable from [`detection-rules/local_rules.xml`](detection-rules/local_rules.xml).
-
 ## P2: Azure Integration and Cloud Detection Engineering
 
-Extending the Phase 1 lab environment into Azure via Arc. Same machines, same kill chain — now visible to cloud-native tooling.
+Extending the Phase 1 lab environment into Azure via Arc, and hardening the on-prem detection stack. Same machines, same kill chain — now visible to cloud-native tooling and backed by automated response.
 
 | File | Lab | Coverage |
 |------|-----|----------|
 | [00-LAB-P2-1a.md](00-LAB-P2-1a.md) | Azure Arc Onboarding + MCSB Baseline Assessment | MCSB v2, Entra ID posture, Azure Policy |
+| [00-LAB-P2-1b.md](00-LAB-P2-1b.md) | SSH Brute Force Detection + Active Response — Ubuntu 25.04 PAM log path | T1110, T1110.001, T1136.001, T1543.003 |
 
 Microsoft Sentinel and KQL detection engineering coming next.
+
+The eight custom detection rules validated across these labs are deployable from [`detection-rules/local_rules.xml`](detection-rules/local_rules.xml); see the [detection-rules catalog](detection-rules/README.md) for the full rule index, MITRE mapping, and validation status.
 
 ## AEGIS Research
 
