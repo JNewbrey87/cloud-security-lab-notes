@@ -26,7 +26,7 @@ Extending the Phase 1 lab environment into Azure via Arc, and hardening the on-p
 
 Microsoft Sentinel and KQL detection engineering coming next.
 
-The eight custom detection rules validated across these labs are deployable from [`detection-rules/local_rules.xml`](detection-rules/local_rules.xml); see the [detection-rules catalog](detection-rules/README.md) for the full rule index, MITRE mapping, and validation status.
+The eight custom detection rules validated across these labs are deployable from [`detection-rules/local_rules.xml`](detection-rules/local_rules.xml); see the [detection-rules catalog](detection-rules/Detection-Rules-README.md) for the full rule index, MITRE mapping, and validation status.
 
 ## AEGIS Research
 
