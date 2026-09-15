@@ -1,9 +1,9 @@
 # AEGIS Evidence Ledger: Tamper-Evident Custody for Agent Decisions
 
-**Project:** AEGIS (Adaptive Execution and Generative Intelligence System)
-**Type:** Local AI Red/Blue Team simulation, evidentiary layer
-**Platform:** ASUS ROG Flow Z13 (Ryzen AI Max+ 395, Radeon 8060S, 128 GB unified), local inference via Ollama
-**Companion:** [The GPU That Was Never On](AEGIS-GPU-Investigation.md) | **Follows:** [AEGIS-PoC-70b.md](AEGIS-PoC-70b.md)
+**Project:** AEGIS (Adaptive Execution and Generative Intelligence System)  
+**Type:** Local AI Red/Blue Team simulation, evidentiary layer  
+**Platform:** ASUS ROG Flow Z13 (Ryzen AI Max+ 395, Radeon 8060S, 128 GB unified), local inference via Ollama  
+**Companion:** [The GPU That Was Never On](AEGIS-GPU-Investigation.md) | **Follows:** [AEGIS-PoC-70b.md](AEGIS-PoC-70b.md)  
 
 ---
 
