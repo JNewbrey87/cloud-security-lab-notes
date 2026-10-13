@@ -76,9 +76,9 @@ A CVSS Base Score is context-free by design; it describes the vulnerability, not
 
 The takeaway is the whole reason the exercise exists: the single highest-priority item is a 5.3 Base Score finding, and it ranks first only because environmental context elevated it. A prioritization process that stopped at the base number would have mis-ranked the most important thing in the scan.
 
-![Nessus findings summary across the three lab hosts](screenshots/cysa-01-findings-summary.png)
+![Nessus findings summary across the three lab hosts](../screenshots/cysa-01-findings-summary.png)
 
-![SMB Signing Not Required, Plugin 57608 detail](screenshots/cysa-01-smb-signing-finding.png)
+![SMB Signing Not Required, Plugin 57608 detail](../screenshots/cysa-01-smb-signing-finding.png)
 
 ## Remediation Plan
 
