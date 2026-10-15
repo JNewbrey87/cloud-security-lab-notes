@@ -1,12 +1,12 @@
 # Volatile Memory Capture and Analysis: Live Acquisition from a Windows Jump Box
 
-**Project:** CySA+ Lab Track, Digital Forensics and Incident Response
-**Session:** 02 | **Platform:** VirtualBox on Windows 11 Pro, isolated host-only network
-**Acquisition host:** LAB-WSJP-25 (Windows Server 2025, Tier 1 jump box) | **Analysis host:** LAB-KALI
-**Tools:** WinPmem v4.0.rc1, Volatility3 2.28.2
-**MITRE ATT&CK (detection relevance):** [T1059.001 — PowerShell](https://attack.mitre.org/techniques/T1059/001/), [T1218 — System Binary Proxy Execution (LOLBins)](https://attack.mitre.org/techniques/T1218/)
+**Project:** CySA+ Lab Track, Digital Forensics and Incident Response  
+**Session:** 02 | **Platform:** VirtualBox on Windows 11 Pro, isolated host-only network  
+**Acquisition host:** LAB-WSJP-25 (Windows Server 2025, Tier 1 jump box) | **Analysis host:** LAB-KALI  
+**Tools:** WinPmem v4.0.rc1, Volatility3 2.28.2  
+**MITRE ATT&CK (detection relevance):** [T1059.001 — PowerShell](https://attack.mitre.org/techniques/T1059/001/), [T1218 — System Binary Proxy Execution (LOLBins)](https://attack.mitre.org/techniques/T1218/)  
 **Cert Alignment:** CySA+ CS0-004, Domain 4 (Incident Response and Digital Forensics): order of volatility, live acquisition, chain of custody, memory artifact triage
-**Date:** October 2026
+**Date:** October 2026  
 
 ---
 
