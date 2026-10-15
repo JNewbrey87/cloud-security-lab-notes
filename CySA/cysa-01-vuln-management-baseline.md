@@ -1,10 +1,10 @@
 # Vulnerability Management Baseline: Nessus Scan of the Lab Environment
 
-**Project:** CySA+ Lab Track, Vulnerability Management
-**Session:** VM-01 | **Platform:** VirtualBox on Windows 11 Pro, isolated host-only network
-**Scanner:** Nessus Essentials, uncredentialed Basic Network Scan
-**MITRE ATT&CK:** [T1557.001 — Adversary-in-the-Middle: LLMNR/NBT-NS Poisoning and SMB Relay](https://attack.mitre.org/techniques/T1557/001/)
-**Cert Alignment:** CySA+ CS0-004, Vulnerability Management domain (objectives 2.1 through 2.4)
+**Project:** CySA+ Lab Track, Vulnerability Management  
+**Session:** VM-01 | **Platform:** VirtualBox on Windows 11 Pro, isolated host-only network  
+**Scanner:** Nessus Essentials, uncredentialed Basic Network Scan  
+**MITRE ATT&CK:** [T1557.001 — Adversary-in-the-Middle: LLMNR/NBT-NS Poisoning and SMB Relay](https://attack.mitre.org/techniques/T1557/001/)  
+**Cert Alignment:** CySA+ CS0-004, Vulnerability Management domain (objectives 2.1 through 2.4)  
 **Date:** October 2026
 
 ---
