@@ -5,20 +5,22 @@
 **Acquisition host:** LAB-WSJP-25 (Windows Server 2025, Tier 1 jump box) | **Analysis host:** LAB-KALI  
 **Tools:** WinPmem v4.0.rc1, Volatility3 2.28.2  
 **MITRE ATT&CK (detection relevance):** [T1059.001 — PowerShell](https://attack.mitre.org/techniques/T1059/001/), [T1218 — System Binary Proxy Execution (LOLBins)](https://attack.mitre.org/techniques/T1218/)  
-**Cert Alignment:** CySA+ CS0-004, Domain 4 (Incident Response and Digital Forensics): order of volatility, live acquisition, chain of custody, memory artifact triage
+**Cert Alignment:** CySA+ CS0-004, Domain 3 (Incident Response and Management), with Domain 1 (Security Operations) as secondary  
 **Date:** October 2026  
 
 ---
 
-## Scenario
+## Why I Did This One
 
-Volatile memory is the most perishable evidence on a running system. RFC 3227's order of volatility puts RAM near the top, above disk and well above backups, because it holds state that vanishes the moment the machine reboots or loses power: running processes, injected code, decrypted material, live network connections, and command lines that were never written to disk. Wait, and it is gone. This lab runs the full preservation workflow against a live host: acquire physical memory to an isolated evidence destination, hash it at the source, verify the hash on arrival, lock the original read-only, then triage it with Volatility3.
+My first lab in this track got me thinking about the order of volatility, and I realized I'd never actually preserved memory from a live Windows box. I know my way around a running server, but capturing its RAM as evidence, in a way I could prove hadn't been changed, was new territory. RAM is about as perishable as evidence gets: running processes, network connections, and command lines that never hit the disk are gone the moment the machine reboots.
 
-The subject is the Tier 1 jump box from my existing lab, the same host that brokers administrative sessions in the kill-chain and vulnerability-management work. Privileged credentials pass through a jump box, which makes it both a realistic target and a realistic thing to have to image under pressure.
+So I picked the jump box from my lab, the same machine that handles admin sessions in my kill-chain and scanning labs, and taught myself the whole workflow. Capture the memory, send it somewhere other than the machine itself, hash it on both ends, lock the copy read-only, and then dig into it with Volatility3.
 
-## Preparing the Evidence Destination
+I actually ran this lab twice. My first pass on October 14 worked, but when I reviewed it I found real problems: I hadn't hashed the image at acquisition, I'd written the dump to the jump box's own disk, and I'd misdiagnosed one of the plugin failures. So I went back on October 15 and redid the acquisition properly. This writeup is the corrected version.
 
-The single most important forensic decision here is where the image lands. Writing a memory dump to the subject's own disk alters the subject and risks overwriting the very evidence you are trying to preserve. So the dump goes to an isolated SMB evidence share on the Kali analysis host instead, and the acquisition writes to it directly over the host-only segment.
+## Setting Up a Place for the Evidence to Land
+
+The first fix was where the image goes. Writing a memory dump to the machine you're investigating changes that machine and can overwrite the evidence you're after, which is exactly what I'd done on my first pass. This time I set up an SMB share on my Kali analysis box and had the acquisition write straight to it over the lab network.
 
 ```ini
 # /etc/samba/smb.conf (relevant sections), on LAB-KALI
@@ -33,20 +35,22 @@ The single most important forensic decision here is where the image lands. Writi
    writable = yes
 ```
 
-`map to guest = never` is load-bearing: without it, Windows Server 2025 rejects the connection with error 1272 (guest-access policy block). The share is scoped to a single account, not opened to Everyone. One practical prerequisite worth noting for future large-artifact labs: the Kali VDI had to be grown from 40 GB to 60 GB first, because a resident Nessus install left too little headroom for an 8.3 GB image.
+The `map to guest = never` line took me a minute to figure out. Without it, Windows Server 2025 refused the connection with error 1272, which is its guest-access policy block. I also locked the share to a single account instead of opening it up to everyone. One more practical thing: I had to grow the Kali VM's disk from 40 GB to 60 GB first, because Nessus was already taking up enough space that an 8.3 GB image wouldn't fit.
 
-## Acquisition with Chain of Custody
+## Capturing the Memory
 
-A pre-acquisition UTC timestamp was recorded, then WinPmem wrote the image straight to the mapped evidence share:
+I recorded a UTC timestamp before starting, then had WinPmem write the image directly to the mapped share:
 
 ```powershell
 # Administrator PowerShell on LAB-WSJP-25
 C:\temp\winpmem.exe Z:\memdump_20261015.raw
 ```
 
-WinPmem extracts a signed kernel driver to a temp path, loads it, maps physical memory, streams it to the target, then unloads and deletes the driver, leaving no persistent system change. The image was 8,925,478,912 bytes, consistent with the VM's 8 GB RAM allocation.
+WinPmem drops a signed kernel driver into a temp folder, loads it, reads physical memory, streams it to the destination, then unloads and deletes the driver. The image came out to 8,925,478,912 bytes, which matches the VM's 8 GB of RAM.
 
-Chain of custody is the part that turns a memory dump into evidence:
+### Chain of Custody
+
+This is the part I skipped the first time and wanted to get right:
 
 | Field | Value |
 |-------|-------|
@@ -61,57 +65,59 @@ Chain of custody is the part that turns a memory dump into evidence:
 | Integrity | PASS |
 | Original after verification | read-only (`chmod 444`) |
 
-The hash was taken on the source host immediately after acquisition and recomputed on Kali after transfer; the two matched, and the image was then marked read-only to stand in for a hardware write-blocker. A capture you cannot prove is unchanged is not evidence, it is just a file.
+I hashed the image on the jump box right after capture, hashed it again on Kali after the transfer, and the two matched. Then I set the file to read-only as my stand-in for a hardware write blocker. Without that hash match, I'd just have a big file and my word that it hadn't changed.
 
-### Acquisition Footprint
+### What the Capture Left Behind
 
-Live acquisition necessarily touches the system it acquires, and the honest move is to document that rather than pretend otherwise:
+Capturing memory from a live machine changes that machine a little, no way around it. I wanted to write down exactly how, rather than call it "non-destructive":
 
 | Artifact | Detail | Persistent? |
 |----------|--------|-------------|
-| Process entry | `winpmem.exe` (PID 8992), child of `powershell.exe` | No, exits after acquisition |
+| Process entry | `winpmem.exe`, running as a child of `powershell.exe` | No, exits after acquisition |
 | Kernel driver | Extracted to `%TEMP%\pme####.tmp`, loaded, then unloaded and deleted | No, removed at completion |
 | Local disk write | None; the dump went to the network share | N/A |
 | Network connection | Outbound SMB (445) to the evidence share | No, mapping removed after |
-| Memory modification | WinPmem's own process and driver data appear in the dump | Expected, the act of acquisition is recorded |
+| Memory changes | WinPmem's own process and driver show up in the dump | Expected; the capture records itself |
 
-This is inherent to live memory forensics and consistent with RFC 3227. The dump captures its own acquisition; you document it and move on.
+So the footprint is minimal and documented. The dump includes the capture itself, which is just how live memory forensics works.
 
-## Analysis with Volatility3
+## Digging In with Volatility3
+
+One note on sources before the results: the process list and command-line findings below are from my first capture on October 14. My notes from the redo recorded the process state as equivalent, so I kept the first run's details. The network results further down come from the October 15 image, the one with the verified hash.
 
 ### windows.pslist
 
-The process list proves the capture is genuinely live, because the acquisition tool captured its own process entry. The chain `explorer.exe (4924) → powershell.exe (7648) → winpmem.exe (8992)` is fully recoverable, which is exactly the provenance a reviewer should be able to confirm from the image itself.
+The process list showed the capture tool in its own snapshot, which is how I knew this was a genuinely live capture. The parent chain was all there: `explorer.exe (4924) → powershell.exe (7648) → winpmem.exe (8992)`. That's a nice thing to have when you're documenting how evidence was collected, because the image itself shows where it came from.
 
 | PID | PPID | Process | Note |
 |-----|------|---------|------|
 | 4924 | 984 | explorer.exe | Desktop shell |
 | 7648 | 4924 | powershell.exe | The admin session |
-| 8992 | 7648 | winpmem.exe | The acquisition tool |
-| 6900 | 4924 | shutdown.exe | Resolved below, with evidence |
-| 6816 | 4924 | AzureArcSysTra | Azure Arc agent, see Cloud Forensics |
-| 3084 | 4924 | VBoxTray.exe | Confirms the VirtualBox guest |
+| 8992 | 7648 | winpmem.exe | The capture tool |
+| 6900 | 4924 | shutdown.exe | Looked into below |
+| 6816 | 4924 | AzureArcSysTra | Azure Arc agent, see below |
+| 3084 | 4924 | VBoxTray.exe | Confirms it's a VirtualBox guest |
 
-**`shutdown.exe` (PID 6900), resolved with evidence, not a guess.** A shutdown binary sitting in memory earns immediate attention, because adversaries trigger reboots to flush exactly the volatile evidence this capture preserves. Rather than speculate, I queried the Windows System log for Event ID 1074 (shutdown initiated):
+**The `shutdown.exe` question.** Seeing a shutdown binary in memory made me stop, because attackers sometimes force a reboot specifically to wipe the kind of evidence I was trying to save. On my first pass I just guessed it was left over from patching. This time I checked the Windows System log for Event ID 1074, which records when a shutdown is started:
 
 ```powershell
 Get-WinEvent -LogName System | Where-Object {$_.Id -eq 1074} |
   Select-Object -First 5 TimeCreated, Message | Format-List
 ```
 
-Every recent 1074 event was from 2026-10-13, all attributed to `TrustedInstaller.exe` and `MoNotificationUx.exe` ("Operating System: Upgrade (Planned)"), which match the October 2026 cumulative updates installed that day. There was no 1074 event for the acquisition date at all. The evidence-based conclusion: `shutdown.exe` was a residual process from the prior day's update cycle, not an adversarial reboot, and it never completed a shutdown. Flag first, then resolve from the record; the difference between those two sentences is the difference between a finding and a hunch.
+Every recent 1074 event was from October 13, all from `TrustedInstaller.exe` and `MoNotificationUx.exe` ("Operating System: Upgrade (Planned)"), which lines up with the cumulative updates I installed that day. There was nothing at all on the day of the capture. So `shutdown.exe` was left over from the previous day's updates, it never actually shut anything down, and now I had the log to back that up instead of a guess.
 
 ### windows.cmdline
 
-PowerShell ran from its standard System32 path, and the WinPmem command line matched what was executed. No living-off-the-land binaries (wscript, mshta, rundll32, cscript) appeared. This is the memory-resident version of the LOLBin hunt that maps to T1059 and T1218: command lines of processes that have since exited are still in RAM, available here even when nothing was logged to disk.
+PowerShell was running from its normal System32 path, and the WinPmem command line matched what I typed. No living-off-the-land binaries showed up (wscript, mshta, rundll32, cscript). What I liked about this plugin is that command lines for processes that have already exited can still be sitting in RAM, even if nothing was logged to disk.
 
-### windows.netscan versus windows.netstat
+### windows.netscan, and Why netstat Saved Me
 
-`windows.netscan` returned no connections, and the interesting part is why. Verbose output confirmed Volatility3 did load a valid symbol table for this kernel (`ntkrnlmp.pdb/A90C614A...`); the repeated "Symbol table requirement not yet fulfilled" lines are the automagic framework iterating through layer permutations, which is normal, not an error. The real failure is at the plugin level: netscan parses `_TCP_ENDPOINT` and `_TCP_LISTENER` structures whose layout changed in Windows Server 2025 (Build 26100) in a way that this Volatility build's netscan parser does not account for, so it finds nothing to parse.
+`windows.netscan` came back with nothing. On my first pass I blamed a missing symbol table and figured `dwarf2json` was the fix. Both were wrong. When I ran it verbose, Volatility3 had loaded a valid symbol table for this kernel just fine (`ntkrnlmp.pdb/A90C614A...`); the "Symbol table requirement not yet fulfilled" messages I'd been worried about are just the framework trying different layer combinations, which is normal. And `dwarf2json` builds symbol tables from Linux and macOS debug data, so it was never going to help with a Windows kernel anyway. Windows symbols come from PDB files through `pdbconv.py`.
 
-That correction matters, because the obvious-sounding fix is wrong. A missing symbol table was not the cause, and `dwarf2json` is not the remedy; `dwarf2json` builds Volatility symbol tables from Linux and macOS DWARF data and has no bearing on Windows kernel symbols (those come from PDBs via `pdbconv.py`), and even a freshly built table would not fix a structure-parsing gap inside the plugin. The right move is to try a different plugin or a newer Volatility.
+The real problem was inside the plugin. netscan reads the `_TCP_ENDPOINT` and `_TCP_LISTENER` structures, and their layout changed in Windows Server 2025 (Build 26100) in a way this version of Volatility doesn't handle. So it ran, found nothing it could parse, and returned empty. A new symbol table wouldn't have fixed that.
 
-`windows.netstat` uses a different traversal path, and it recovered the network state in full:
+`windows.netstat` walks a different path, and it got me the full network picture:
 
 | Proto | Local | Port | State | PID | Owner |
 |-------|-------|------|-------|-----|-------|
@@ -123,39 +129,41 @@ That correction matters, because the obvious-sounding fix is wrong. A missing sy
 | TCPv4 | 127.0.0.1 | 40341/40342 | LISTENING | 7124 | himds.exe (Arc) |
 | TCPv4 | 127.0.0.1 | 40343/40344 | LISTENING | 3796 | arcproxy.exe (Arc) |
 
-Two bound IPs confirm a dual-homed host: `192.168.10.60` on the lab segment and `10.0.2.15` on NAT. A dual-homed jump box is a pivot point, and in a lateral-movement investigation both interfaces and their owning processes have to be mapped. The lesson to bank: on Server 2025, run both netscan and netstat and document which one answered.
+Two IPs means the jump box has two network interfaces: `192.168.10.60` on the lab network and `10.0.2.15` on NAT. A jump box sitting on two networks is a natural pivot point, so in a real lateral-movement investigation I'd want both interfaces mapped. My takeaway on the tooling: on Server 2025, run both netscan and netstat and write down which one worked.
 
-## The Cloud Forensics Bridge
+## The Cloud Angle
 
-The most consequential artifact in the capture is Azure Arc, and this run confirmed it from two independent planes. The process list shows `AzureArcSysTra`; the network state shows `himds.exe` (the Arc Hybrid Instance Metadata Service) and `arcproxy.exe` holding local listener ports. Two different data structures, same conclusion: this on-premises host has live telemetry channels into Azure.
+The finding I found most interesting was Azure Arc, and it showed up two separate ways. The process list had `AzureArcSysTra`, and netstat showed `himds.exe` (Arc's Hybrid Instance Metadata Service) and `arcproxy.exe` listening locally. Two different places in memory, same answer: this on-prem machine was sending telemetry to Azure.
 
-That is what makes a memory-forensics exercise a cloud security lab. Arc enrollment means cloud-side forensic artifacts exist for a machine that physically lives in the lab, so discovering it on a host widens the investigation: the IR scope now includes the Azure tenant, where Arc agent activity logs, Defender for Cloud alerts, and forwarded telemetry all become evidence. The memory image is what tells you the cloud side even exists. A follow-on session will pull the Azure-side forensic snapshot for this same host and reconcile it against what the local capture showed.
+That changed how I thought about the investigation. If a machine is Arc-enrolled, there's evidence for it in Azure too, like Arc agent activity logs, Defender for Cloud alerts, and whatever telemetry got forwarded. So the scope of an investigation doesn't stop at the box itself, and the memory image is what told me the cloud side existed at all.
+
+Arc gives Azure a management and telemetry view of this machine, but the VM itself still lives in my homelab, so there's no Azure disk to snapshot. That's what sent me to [cysa-04](cysa-04-azure-vm-forensic-snapshot.md), where I did a cloud disk acquisition on an actual Azure VM.
 
 ## What I Took Away
 
-**Chain of custody held across a network transfer.** The SHA-256 matched between source and destination, the dump never touched the subject's disk, and the original was locked read-only. That is the memory-forensics equivalent of a clean evidence handoff, and it is the first thing a reviewer should be able to verify.
+**The hash is what makes it evidence.** Matching SHA-256 on both ends, keeping the dump off the jump box's disk, and locking the copy read-only were the three things I skipped the first time. Going back and doing them is the biggest difference between my first pass and this one.
 
-**Evidence beats speculation, and the log was right there.** The earlier instinct on `shutdown.exe` was a reasonable guess; Event ID 1074 turned it into a documented conclusion. The habit of resolving a flag from the record instead of from intuition is most of what separates triage from storytelling.
+**Check the log before trusting the guess.** My first explanation for `shutdown.exe` turned out to be right, but I didn't actually know that until Event ID 1074 showed it. I'd rather have the record than a good hunch.
 
-**Netscan and netstat are not interchangeable.** They read different kernel structures, and on Server 2025 one failed while the other succeeded. A negative result you can explain (a plugin-level parsing gap, not a missing symbol table) is a finding; a negative result you cannot explain is a liability.
+**Know why a tool came back empty.** netscan and netstat read different structures, and on Server 2025 one failed while the other worked. If I'd stopped at "no connections found," I would have published something wrong. Figuring out it was a plugin parsing problem, not a missing symbol table, also corrected a mistake from my own first pass.
 
-**Arc enrollment is a scope decision.** The cloud-security takeaway is not a command, it is recognizing that one agent, confirmed across the process and network planes, redraws the boundary of an investigation. That intersection of digital forensics and cloud is the work I am building toward.
+**One agent can change the scope.** Seeing Arc in both the process list and the network state meant the investigation reached into Azure. That overlap between forensics and cloud is exactly where I want to keep building.
 
 ## Lab Environment
 
 | Component | Details |
 |-----------|---------|
 | Acquisition target | LAB-WSJP-25, Windows Server 2025 (Build 26100), Tier 1 jump box, 8 GB RAM |
-| Acquisition tool | WinPmem v4.0.rc1 (signed driver, non-destructive) |
+| Acquisition tool | WinPmem v4.0.rc1 (signed driver; minimal, documented footprint) |
 | Analysis host | LAB-KALI, Volatility3 2.28.2; isolated SMB evidence share |
 | Evidence handling | Written to network share, hashed at source and verified on arrival, original `chmod 444` |
 | Network | Isolated host-only VirtualBox network (192.168.10.0/24), no external exposure |
 
-## Follow-On Items
+## Follow-On
 
-- Upgrade Volatility3 to a build with Server 2025 netscan support, then re-run and compare against the netstat results.
-- Run `windows.dlllist` against the PowerShell process for module-level triage.
-- Pull the Azure-side forensic snapshot for this host and reconcile it with the memory capture; review the Arc workspace ID and log retention as the prerequisite for that cloud forensic session.
+- Upgrade Volatility3 to a version that supports netscan on Server 2025, re-run it, and compare against the netstat results.
+- Run `windows.dlllist` against the PowerShell process to practice module-level triage.
+- Review Arc telemetry and log retention for this machine. That now needs a step first: the Arc registration for this host was removed when I tore down the resource group in cysa-04, so I'd have to re-onboard it to Arc before there's anything to review.
 
 ---
 
