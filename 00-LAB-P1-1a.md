@@ -1,18 +1,18 @@
-# Lab 1: Wazuh Agent Deployment & First Detection Rule
+# Lab 1: Wazuh Agent Deployment and My First Detection Rule
 
-**Project:** P1 — Wazuh SIEM Home Lab  
-**Phase:** 1 | **Platform:** Hyper-V on Windows 11 Pro  
+**Project:** P1, Wazuh SIEM Home Lab  
+**Phase:** 1a | **Platform:** Hyper-V on Windows 11 Pro (May 2026; the lab later moved to VirtualBox on new hardware)  
 **MITRE ATT&CK:** T1110 — Brute Force (Credential Access)  
-**Cert Alignment:** CySA+ CS0-004, SC-200  
-**Date Completed:** May 2026
+**Cert Alignment:** CySA+ CS0-004, Domain 1 (Security Operations); SC-200  
+**Date Completed:** May 2026  
 
 ---
 
-## Scenario
+## Why I Did This One
 
-A SIEM manager with no agents is just a very expensive log file. Lab 1 is where the home lab stops being a VM setup and becomes an actual security tool: a Wazuh agent is deployed onto a Windows endpoint, a stable agent-manager communication path is established, and a custom detection rule is written to catch real Windows security events.
+This was the first real lab in my homelab, and the point where it went from a few VMs to an actual security tool. Windows servers are part of my day job, and event logs aren't new to me. What I hadn't done was build the detection side myself: get an agent shipping Windows security events to a SIEM I set up, then write my own rule that fires on something real.
 
-The detection target for this lab is Windows Event ID 4625, failed logon attempts, mapped to MITRE T1110 (Brute Force). This is a foundational detection present in virtually every SOC environment. The objective is not simply to see an alert fire; it is to understand the full detection pipeline from audit policy configuration through Windows Security log collection, agent forwarding, and manager-side rule evaluation.
+I picked Windows Event ID 4625, failed logons, because it's about as basic as detections get, and I wanted to understand the whole pipeline end to end before trying anything fancier: audit policy, the Security log, the agent forwarding events, and the manager evaluating them against my rule.
 
 ---
 
@@ -22,106 +22,99 @@ The detection target for this lab is Windows Event ID 4625, failed logon attempt
 [Windows 11 Host]                    [Ubuntu 22.04 VM]
   [WazuhSvc - Agent]     ──────────►  [Wazuh Manager v4.14.5-1]
                                         /var/ossec/
-  vEthernet (Internal)   ◄──────────   eth1 (static IP, internal switch)
-  isolated 192.xx.xx.0/24 subnet
+  vEthernet (LabInternal) ◄────────   static IP, internal switch
+  192.168.10.0/24
 ```
 
-> Real IPs, hostnames, and usernames are omitted from this README per standard home lab portfolio security practice. Substitute values appropriate to your own environment.
+**Why an internal switch instead of the Default Switch.** This was the main networking fix from my early setup. Hyper-V's Default Switch is NAT with DHCP, and across reboots my host and VMs kept landing in different subnets, which broke host-to-VM connectivity completely. Moving everything Wazuh-related onto an isolated internal switch with static IPs fixed it: no DHCP, no NAT, no subnet drift between sessions.
 
-**Network Architecture Decision: Internal Switch over Default Switch**
-
-Hyper-V's Default Switch is NAT-based with DHCP assignment. Across reboots, the host and VMs receive addresses in different subnets, which breaks host-to-VM connectivity entirely. An isolated internal switch with static IPs resolves this; there is no DHCP, no NAT, and no subnet drift between sessions. All Wazuh agent-manager traffic is routed through it.
-
-| Network | Use Case | Wazuh Traffic? |
+| Network | Used for | Wazuh traffic? |
 |---------|----------|----------------|
-| Default Switch (NAT, DHCP) | Internet access for apt/downloads | No; unstable across reboots |
-| Internal Switch (static) | Agent-manager communication | Yes |
+| Default Switch (NAT, DHCP) | Internet access for apt and downloads | No; unstable across reboots |
+| Internal switch (static) | Agent-to-manager communication | Yes |
 
 ---
 
 ## What I Built
 
-### 1. Enhanced Session Mode
+### 1. The Wazuh Manager
 
-Installed `xrdp` and the Ubuntu Hyper-V integration packages on the Ubuntu VM to enable clipboard passthrough between host and VM. On Ubuntu 22.04, the correct packages are `linux-tools-virtual` and `linux-cloud-tools-virtual`; the package name `hyperv-daemons` exists only on Fedora and RHEL-based distributions and is not available in Ubuntu repositories.
+The all-in-one Wazuh installer wasn't viable on the hardware I had at the time; it didn't have the disk or RAM for the full stack. So I installed just the manager from the Wazuh apt repository and deferred the dashboard and indexer until I upgraded hardware. That meant everything in this lab happened at the command line.
+
+### 2. Enhanced Session Mode on the Ubuntu VM
+
+I wanted clipboard passthrough between my host and the Ubuntu VM, so I installed xrdp and the Hyper-V integration packages. On Ubuntu 22.04 those packages are `linux-tools-virtual` and `linux-cloud-tools-virtual`:
 
 ```bash
 # Ubuntu VM
 sudo apt install -y xrdp linux-tools-virtual linux-cloud-tools-virtual
-sudo systemctl enable xrdp
-sudo adduser xrdp ssl-cert
 
 # Host (elevated PowerShell)
 Set-VM -VMName "<ubuntu-vm-name>" -EnhancedSessionTransportType HvSocket
 ```
 
-After rebooting the Ubuntu VM, close the Hyper-V connection window and reconnect. A display resolution prompt confirms Enhanced Session Mode is active.
+### 3. Putting the Host on the Internal Switch
 
-### 2. Host Added to Internal Switch
-
-The Windows 11 host was added to the internal virtual switch via Hyper-V Manager by enabling the management operating system adapter option, then assigned a static IP from the same subnet as the Wazuh manager.
+I added the Windows 11 host to the internal switch in Hyper-V Manager and gave it a static IP on the same subnet as the manager:
 
 ```powershell
-New-NetIPAddress -InterfaceAlias "vEthernet (<switch-name>)" -IPAddress 192.xx.xx.xx -PrefixLength 24
+New-NetIPAddress -InterfaceAlias "vEthernet (LabInternal)" -IPAddress 192.168.10.1 -PrefixLength 24
 ```
 
-Connectivity to the manager should be verified with a ping test before proceeding. If this step fails, nothing downstream will work.
+I pinged the manager before moving on. If that doesn't work, nothing after it will.
 
-### 3. Wazuh Agent Installation
+### 4. Installing and Registering the Agent
 
-The version-matched MSI was downloaded and installed silently with the manager IP embedded at install time. The agent version must match the manager version exactly; mismatched versions result in silent enrollment failures.
+I installed the agent on the Windows 11 host itself, pointed at the manager's internal-switch address. The agent version has to match the manager version exactly, or enrollment fails without much of an explanation.
 
 ```powershell
-Invoke-WebRequest -Uri "https://packages.wazuh.com/4.x/windows/wazuh-agent-4.14.5-1.msi" `
-  -OutFile "$env:TEMP\wazuh-agent.msi"
+msiexec.exe /i wazuh-agent-4.14.5-1.msi /q WAZUH_MANAGER="192.168.10.10"
 
-msiexec /i "$env:TEMP\wazuh-agent.msi" `
-  WAZUH_MANAGER="<manager-ip>" `
-  WAZUH_AGENT_NAME="<agent-name>" /q
+cd "C:\Program Files (x86)\ossec-agent"
+.\agent-auth.exe -m 192.168.10.10
+NET START WazuhSvc
 ```
 
-The agent was enrolled via `agent-auth.exe`, which performs the one-time registration handshake with the authd service on port 1515.
-
-```powershell
-& "C:\Program Files (x86)\ossec-agent\agent-auth.exe" -m <manager-ip>
-# Expected output: INFO: Valid key created. Finishing.
-```
-
-Agent registration was confirmed on the manager side.
+Then I confirmed it showed up on the manager side:
 
 ```bash
 sudo /var/ossec/bin/agent_control -l
-# ID: 001, Name: <agent-name>, IP: any, Active
+# ID: 001, Active
 ```
 
-### 4. Windows Audit Policy Configuration
+### 5. Turning On Failure Auditing
 
-Event ID 4625 is only generated if Windows is configured to audit failed logon attempts. This is not enabled by default on all systems, and its absence is a common reason analysts assume Wazuh is malfunctioning when the agent is actually forwarding events correctly.
+Event 4625 only gets written if Windows is set to audit failed logons. If it isn't, the agent can be working perfectly and you'll still never see a single alert, which looks a lot like Wazuh being broken.
 
 ```powershell
-auditpol /get /subcategory:"Logon"            # verify current setting
 auditpol /set /subcategory:"Logon" /failure:enable
+auditpol /get /subcategory:"Logon"   # confirm it applied
 ```
 
-### 5. Windows Firewall Rules
+### 6. Firewall Rules for the Agent Ports
 
-The internal switch adapter is classified as a Public or Unidentified network profile in Windows. The `Set-NetConnectionProfile` cmdlet cannot modify the profile on Hyper-V virtual adapters. The workaround is to add outbound firewall rules scoped to all profiles rather than attempting to change the network category.
+I added outbound rules for the agent's two ports, 1514 (events) and 1515 (enrollment), scoped to all network profiles:
 
 ```powershell
-New-NetFirewallRule -DisplayName "Wazuh 1514 UDP" -Direction Outbound -Protocol UDP -RemotePort 1514 -Action Allow -Profile Any
-New-NetFirewallRule -DisplayName "Wazuh 1515 TCP" -Direction Outbound -Protocol TCP -RemotePort 1515 -Action Allow -Profile Any
+New-NetFirewallRule -DisplayName "Wazuh Agent - Events (UDP 1514)" `
+  -Direction Outbound -Protocol UDP -LocalPort 1514 -Action Allow -Profile Any
+
+New-NetFirewallRule -DisplayName "Wazuh Agent - Auth (TCP 1515)" `
+  -Direction Outbound -Protocol TCP -LocalPort 1515 -Action Allow -Profile Any
 ```
 
-### 6. Custom Detection Rule
+Looking back, I'd write these with `-RemotePort` instead of `-LocalPort`. 1514 and 1515 are the ports on the manager's side, and the agent's own outbound port is random. Windows Firewall also allows outbound traffic by default, so these rules were more insurance than a requirement.
 
-The first custom detection rule was written in `/var/ossec/etc/rules/local_rules.xml`. It targets Event ID 4625 directly on the eventID field using a regex anchor, which is more reliable than inheriting from the `authentication_failed` parent group, as the latter requires a chain of built-in rules to evaluate first.
+### 7. My First Custom Rule
+
+I wrote the rule in `/var/ossec/etc/rules/local_rules.xml` on the manager:
 
 ```xml
-<group name="local,windows,authentication_failed,">
+<group name="local,">
   <rule id="100002" level="10">
     <if_group>windows</if_group>
     <field name="win.system.eventID">^4625$</field>
-    <description>Windows failed logon detected (Event 4625)</description>
+    <description>Custom: Windows failed logon attempt detected (Event 4625)</description>
     <mitre>
       <id>T1110</id>
     </mitre>
@@ -129,12 +122,11 @@ The first custom detection rule was written in `/var/ossec/etc/rules/local_rules
 </group>
 ```
 
-Key decisions in the rule design:
+A few choices I made:
 
-- **Rule ID 100002**: The default `local_rules.xml` template already contains an example rule using ID 100001. Duplicate IDs cause one rule to be silently dropped; custom rules should start at 100002 or higher.
-- **Parent condition**: `<if_group>windows</if_group>` provides a broader, more stable parent match than `authentication_failed`.
-- **Alert level 10**: High priority; warrants immediate analyst attention.
-- **MITRE T1110**: Brute Force technique, Credential Access tactic.
+- **Rule ID 100002.** Custom rules live in the 100000+ range so they don't collide with Wazuh's built-in rules. The default `local_rules.xml` already ships with an example rule at 100001, and a duplicate ID gets silently dropped, so I started at 100002.
+- **Matching on the event ID directly.** `<if_group>windows</if_group>` plus an anchored match on `eventID` was simpler and more reliable for me than depending on Wazuh's built-in authentication-failure rule chain.
+- **Level 10.** High priority, worth an analyst looking right away.
 
 ```bash
 sudo systemctl restart wazuh-manager
@@ -144,41 +136,32 @@ sudo systemctl restart wazuh-manager
 
 ## What I Detected
 
-Failed logon attempts were generated on the Windows endpoint to trigger the detection rule.
+I generated a failed logon on purpose with a user that doesn't exist:
 
 ```powershell
-runas /user:nonexistentuser cmd
-# Enter any incorrect password when prompted; repeat 2-3 times
+runas /user:fakeuser123 cmd
+# enter any password; it fails and writes Event 4625
 ```
 
-The alert was confirmed in `/var/ossec/logs/alerts/alerts.log` within seconds.
+Then I watched the alerts log on the manager:
 
-```
-Rule: 100002 (level 10) -> 'Windows failed logon detected (Event 4625)'
-
-win.system.eventID: 4625
-win.system.severityValue: AUDIT_FAILURE
-win.eventdata.targetUserName: nonexistentuser
-win.eventdata.status: 0xc000006d       # bad username or wrong password
-win.eventdata.logonType: 2             # interactive logon attempt
-win.eventdata.authenticationPackageName: Negotiate
+```bash
+tail -f /var/ossec/logs/alerts/alerts.log | grep "100002"
 ```
 
-The full pipeline was confirmed: Windows Security log, Wazuh agent, internal switch, manager, custom rule evaluation, alert generation.
+Rule 100002 fired on the very first try, with the MITRE T1110 tag attached. That confirmed the full pipeline: Windows Security log, agent, internal switch, manager, my rule, alert.
 
 ---
 
 ## What I Learned
 
-**The Default Switch creates a network topology problem, not a Wazuh problem.** The error message when the agent cannot reach the manager on port 1515 looks like a Wazuh configuration or authentication failure. In this case, the root cause was that the Hyper-V Default Switch had assigned the host and the Ubuntu VM to different subnets after a reboot, breaking basic IP connectivity before Wazuh was ever involved. An isolated internal switch with static IPs is the correct solution for lab environments where stable agent-manager communication is required.
+**The networking problem looked like a Wazuh problem.** When the agent couldn't reach the manager, the errors made it look like a Wazuh configuration or authentication issue. The actual cause was the Default Switch putting my host and VM on different subnets after a reboot. Wazuh never even got a chance to fail. Basic connectivity is worth checking before blaming the application.
 
-**Audit policy is a prerequisite, not an optional step.** If `auditpol` is not configured for failure auditing, Event ID 4625 is never generated and never forwarded. The agent can be functioning correctly and the alerts log will remain empty. Verifying audit policy should be part of any Wazuh Windows agent checklist.
+**Audit policy comes first.** Without failure auditing turned on, Event 4625 never exists, so there's nothing to forward. I'd put it at the top of any Windows Wazuh agent checklist.
 
-**Avoid `apt full-upgrade` on Hyper-V Kali images.** A full upgrade replaces display and graphics components that are incompatible with the Hyper-V framebuffer. The VM continues running but presents a black screen. The safe approach is `apt upgrade` only, which skips the problematic package replacements.
+**Duplicate rule IDs fail silently.** A second rule with an ID that's already in use doesn't throw an error. One of them just disappears. Starting at 100002 avoids the example rule in the default file.
 
-**Duplicate rule IDs in `local_rules.xml` cause silent failures.** The default template file includes an example rule using ID 100001. Adding a second rule with the same ID results in one being silently discarded; the analyst gets no error and no alert. Replacing the full file contents rather than appending, and using IDs starting at 100002, avoids this entirely.
-
-**`hyperv-daemons` is not available on Ubuntu.** The Fedora and RHEL package by that name does not have a direct Ubuntu equivalent by the same name. The equivalent functionality on Ubuntu 22.04 is provided by `linux-tools-virtual` and `linux-cloud-tools-virtual`.
+**Don't run `apt full-upgrade` on a Hyper-V Kali VM.** I didn't need Kali for this lab, but I learned this one the hard way during the same session: a full upgrade replaced display components the Hyper-V framebuffer didn't like, and I got a black screen. Twice. `apt upgrade` only.
 
 ---
 
@@ -186,20 +169,21 @@ The full pipeline was confirmed: Windows Security log, Wazuh agent, internal swi
 
 | Component | Details |
 |-----------|---------|
-| Host | Windows 11 Pro, Hyper-V enabled |
-| SIEM Manager | Ubuntu 22.04 LTS, Wazuh v4.14.5-1 (manager only; indexer and dashboard deferred to hardware upgrade) |
-| Wazuh Agent | Windows 11 host, v4.14.5-1, ID 001 |
+| Host | Windows 11 Pro, Hyper-V (May 2026 hardware) |
+| SIEM Manager | Ubuntu 22.04 LTS, Wazuh v4.14.5-1 (manager only; dashboard and indexer added after the hardware upgrade) |
+| Wazuh Agent | Windows 11 host, v4.14.5-1, agent ID 001 |
 | Network | Isolated internal Hyper-V switch, static IPs |
 
 ---
 
-## Up Next
+## What Came Next
 
-- **Lab 1b:** SSH brute force detection — Kali attacker VM, Hydra, and a frequency-based custom rule. See [00-LAB-P1-1b.md](00-LAB-P1-1b.md).
-- **Lab 1c:** Tiered AD environment — lab.local forest, Tier 0 DC, Tier 1 jump box, and rule 100002 on a domain-joined host. See [00-LAB-P1-1c.md](00-LAB-P1-1c.md).
-- **Lab 1d:** Two-stage kill chain — lateral movement detection via rules 100004 + 100005. See [00-LAB-P1-1d.md](00-LAB-P1-1d.md).
-- **Phase 2:** Azure Arc, Microsoft Sentinel, and KQL detection engineering. Begins August 2026.
+- **[Lab 1b](00-LAB-P1-1b.md):** SSH brute force detection, with a Kali attacker VM, Hydra, and a frequency-based rule.
+- **[Lab 1c](00-LAB-P1-1c.md):** a tiered Active Directory lab (lab.local forest, Tier 0 DC, Tier 1 jump box), with rule 100002 running on a domain-joined host.
+- **[Lab 1d](00-LAB-P1-1d.md):** a two-stage kill chain, detecting lateral movement with rules 100004 and 100005.
+- **[P2-1a](00-LAB-P2-1a.md):** Azure Arc onboarding and a cloud security baseline for the same lab machines.
+- All of the custom rules from this series are collected in [`detection-rules/local_rules.xml`](detection-rules/local_rules.xml).
 
 ---
 
-*Part of [cloud-security-lab-notes](https://github.com/JNewbrey87/cloud-security-lab-notes) | Joshua E. Newbrey | [LinkedIn](https://www.linkedin.com/in/jnewbrey87/) | [GitHub Profile](https://github.com/JNewbrey87).*
+*Part of [cloud-security-lab-notes](https://github.com/JNewbrey87/cloud-security-lab-notes) | Joshua E. Newbrey | [LinkedIn](https://www.linkedin.com/in/jnewbrey87/) | [GitHub Profile](https://github.com/JNewbrey87)*
