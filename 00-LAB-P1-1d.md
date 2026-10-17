@@ -118,9 +118,9 @@ Rule: 100004 (level 12) -> 'Custom: Explicit credential use toward remote host d
 |------|----------|------|------|-----------|
 | 100002 | 4625 | LAB-WSJP-25 | 3 | T1110 |
 | 100004 | 4648 | LAB-WSJP-25 | 3 | T1021.002 |
-| 100005 | 4625 (type 3) | LAB-WSDC-22 | 1 | T1021.002 |
+| 100002 | 4625 | LAB-WSDC-22 | 1 | T1021.002 |
 
-In the Wazuh Threat Hunting dashboard, filtered to level 12 and up, the kill chain was visible as a sequence: failed logons on the jump box, then explicit credential use from the same host, then a failed network logon arriving at the DC. Rule 100005 was deployed and the DC-side events were confirmed flowing to the manager during this session. I did the full live-run validation of rule 100005, including the NTLM-fallback detail, in a follow-up session on June 27.
+In the Wazuh Threat Hunting dashboard, filtered to level 12 and up, the kill chain was visible as a sequence: failed logons on the jump box, then explicit credential use from the same host, then a failed network logon arriving at the DC. In this session, the DC-side failure was caught by rule 100002, my general failed-logon rule. Rule 100005 was deployed and the DC-side events were confirmed flowing to the manager, but it hadn't been validated live yet. I did the full live-run validation of rule 100005, including the NTLM-fallback detail, in a follow-up session on June 27.
 
 ## What I Took Away
 
