@@ -137,7 +137,7 @@ The finding I found most interesting was Azure Arc, and it showed up two separat
 
 That changed how I thought about the investigation. If a machine is Arc-enrolled, there's evidence for it in Azure too, like Arc agent activity logs, Defender for Cloud alerts, and whatever telemetry got forwarded. So the scope of an investigation doesn't stop at the box itself, and the memory image is what told me the cloud side existed at all.
 
-Arc gives Azure a management and telemetry view of this machine, but the VM itself still lives in my homelab, so there's no Azure disk to snapshot. That's what sent me to [cysa-04](cysa-04-azure-vm-forensic-snapshot.md), where I did a cloud disk acquisition on an actual Azure VM.
+Arc gives Azure a management and telemetry view of this machine, but the VM itself still lives in my homelab, so there's no Azure disk to snapshot. That's what sent me to [cysa-04](04-cysa-azure-vm-forensic-snapshot.md), where I did a cloud disk acquisition on an actual Azure VM.
 
 ## What I Took Away
 
