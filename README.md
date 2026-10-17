@@ -46,10 +46,10 @@ AEGIS is my local Red Team / Blue Team AI simulation, running entirely on my own
 
 | Lab | Maps To |
 |-----|---------|
-| [AEGIS PoC Run 2: llama3.3:70b Adversarial Simulation](aegis/aegis-00-poc-70b.md) | Model scale and security reasoning quality |
-| [Rebuilding the Stack on New Hardware and Migrating to CrewAI 1.x](aegis/aegis-01-crewai-migration.md) | Local inference operations; recovering a broken runtime |
-| [AEGIS Evidence Ledger: Tamper-Evident Custody for Agent Decisions](aegis/aegis-02-evidence-ledger.md) | CFRPF Immutable Evidence Preservation; AI Auditability |
-| [Silent CPU Fallback: Why My 70B Model Stopped Using the GPU](aegis/aegis-03-gpu-cpu-fallback.md) | Silent failure in local inference; verifying what the system reports |
+| [AEGIS PoC Run 2: llama3.3:70b Adversarial Simulation](aegis/00-AEGIS-PoC-70b.md) | Model scale and security reasoning quality |
+| [Rebuilding the Stack on New Hardware and Migrating to CrewAI 1.x](aegis/01-AEGIS-CrewAI-1x-Migration.md) | Local inference operations; recovering a broken runtime |
+| [AEGIS Evidence Ledger: Tamper-Evident Custody for Agent Decisions](aegis/02-AEGIS-Evidence-Ledger.md) | CFRPF Immutable Evidence Preservation; AI Auditability |
+| [Silent CPU Fallback: Why My 70B Model Stopped Using the GPU](aegis/03-AEGIS-GPU-Investigation.md) | Silent failure in local inference; verifying what the system reports |
 
 ## Vulnerability Management, Forensics, and Incident Response (CySA+ Track)
 
@@ -57,11 +57,11 @@ Labs built around the CySA+ CS0-004 objectives, run on the same lab machines: sc
 
 | Lab | Maps To |
 |-----|---------|
-| [Vulnerability Management Baseline: Nessus Scan of the Lab Environment](CySA/cysa-01-vuln-management-baseline.md) | CySA+ Domain 2; T1557.001 |
-| [Volatile Memory Capture and Analysis: Live Acquisition from a Windows Jump Box](CySA/cysa-02-volatile-ram-capture.md) | CySA+ Domains 3 and 1; T1059.001, T1218 |
-| [Credentialed Vulnerability Scanning: Finding What the Perimeter Cannot See](CySA/cysa-03-dc-credentialed-scan.md) | CySA+ Domain 2; T1553.002 |
-| [Cloud Forensic Acquisition: Snapshotting a Running Azure VM](CySA/cysa-04-azure-vm-forensic-snapshot.md) | CySA+ Domains 3 and 1 |
-| [Incident Response Capstone: Running a Full IR Cycle on the Lab Kill Chain](CySA/cysa-05-ir-capstone.md) | CySA+ Domains 3, 1, and 4; T1110, T1021.002 |
+| [Vulnerability Management Baseline: Nessus Scan of the Lab Environment](CySA/01-cysa-vuln-management-baseline.md) | CySA+ Domain 2; T1557.001 |
+| [Volatile Memory Capture and Analysis: Live Acquisition from a Windows Jump Box](CySA/02-cysa-volatile-ram-capture.md) | CySA+ Domains 3 and 1; T1059.001, T1218 |
+| [Credentialed Vulnerability Scanning: Finding What the Perimeter Cannot See](CySA/03-cysa-dc-credentialed-scan.md) | CySA+ Domain 2; T1553.002 |
+| [Cloud Forensic Acquisition: Snapshotting a Running Azure VM](CySA/04-cysa-azure-vm-forensic-snapshot.md) | CySA+ Domains 3 and 1 |
+| [Incident Response Capstone: Running a Full IR Cycle on the Lab Kill Chain](CySA/05-cysa-ir-capstone.md) | CySA+ Domains 3, 1, and 4; T1110, T1021.002 |
 
 ## Retrospectives
 
