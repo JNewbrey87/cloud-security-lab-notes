@@ -1,19 +1,19 @@
 # Vulnerability Management Baseline: Nessus Scan of the Lab Environment
 
 **Project:** CySA+ Lab Track, Vulnerability Management  
-**Session:** VM-01 | **Platform:** VirtualBox on Windows 11 Pro, isolated host-only network  
+**Session:** 01 | **Platform:** VirtualBox on Windows 11 Pro, isolated host-only network  
 **Scanner:** Nessus Essentials, uncredentialed Basic Network Scan  
 **MITRE ATT&CK:** [T1557.001 — Adversary-in-the-Middle: LLMNR/NBT-NS Poisoning and SMB Relay](https://attack.mitre.org/techniques/T1557/001/)  
-**Cert Alignment:** CySA+ CS0-004, Vulnerability Management domain (objectives 2.1 through 2.4)  
-**Date:** October 2026
+**Cert Alignment:** CySA+ CS0-004, Domain 2 (Vulnerability Management), objectives 2.1 through 2.4  
+**Date:** October 2026  
 
 ---
 
-## Scenario
+## Why I Did This One
 
-My home lab was built for detection engineering: a Wazuh SIEM with eight custom rules and a validated kill chain across a tiered Active Directory environment. That is strong coverage of the Security Operations domain, but it left a gap. CySA+ CS0-004 weights Vulnerability Management at 26% of the exam, and I had no scanner, no scan-to-prioritization-to-remediation workflow, and no CVSS reps against real findings. This session closes the front of that gap by running a baseline vulnerability scan against the machines I already operate, then turning the raw output into a prioritized, context-aware remediation plan.
+My homelab started out as a detection lab: a Wazuh SIEM with eight custom rules and a validated kill chain across a tiered Active Directory setup. What it didn't have was any vulnerability management. There was no scanner in the lab at all.
 
-The point of the exercise is not the scan itself; a scanner is easy to run. The point is the workflow after the scan: separating signal from informational noise, re-scoring findings against what each asset is actually worth, and producing a remediation plan someone could act on.
+Scanning and patching are already part of my infrastructure work, so running Nessus wasn't new to me. What I wanted from this lab was the part that tends to get skipped when you're working through a patch queue: slowing down on the results to figure out which findings actually matter, re-scoring them against what each machine is worth, and building a remediation plan I could defend instead of just patching whatever shows up red. CySA+ puts Vulnerability Management at 26% of the exam, so this was also where my studying needed the most hands-on time.
 
 ## Architecture
 
@@ -23,17 +23,17 @@ The point of the exercise is not the scan itself; a scanner is easy to run. The 
                                            [LAB-UBTU]     Wazuh Manager              192.168.10.10
 ```
 
-All hosts sit on an isolated host-only VirtualBox network with no external exposure. The scan was run from a host on that same segment, so it measures what a network-adjacent attacker inside the lab perimeter would see.
+Everything sits on an isolated host-only VirtualBox network with no outside exposure. I ran the scan from a host on the same segment, so it shows what an attacker already inside the lab network would see.
 
 ## What I Ran
 
-Nessus Essentials, Basic Network Scan policy, no credentials supplied. An uncredentialed scan is a deliberate starting point, not a limitation I overlooked. It assesses only the externally visible attack surface: open ports, service banners, protocol behavior, and configuration flags that are detectable without logging in. All three hosts returned `Auth: Fail`, confirming no credentialed assessment occurred, so every result here reflects the external exposure baseline.
+I started with a Basic Network Scan and no credentials, on purpose. An uncredentialed scan only sees what's visible from the outside: open ports, service banners, protocol behavior, and config flags you can detect without logging in. All three hosts came back `Auth: Fail`, which confirmed nothing was assessed from the inside.
 
-A credentialed scan would examine installed software versions, registry settings, and local policy from the inside, and it would produce a substantially higher finding count. Running the uncredentialed pass first establishes the baseline an outside attacker sees; the credentialed pass (planned next, see Up Next) then shows how much more is visible once you are inside. Knowing the difference between those two pictures is itself part of the Vulnerability Management objective.
+I wanted that outside view first so I'd have something to compare a credentialed scan against later. A credentialed scan reads installed software, registry settings, and local policy, and it usually finds a lot more. Having both pictures is how you tell what an attacker on the network sees versus what's actually going on inside the box.
 
 ## What the Scan Returned
 
-The scan completed in fifteen minutes, and all three hosts returned `Auth: Fail` as expected for an uncredentialed pass.
+The scan took about fifteen minutes.
 
 | Host | Role | IP | Findings | Medium | Info |
 |------|------|----|----------|--------|------|
@@ -41,13 +41,13 @@ The scan completed in fifteen minutes, and all three hosts returned `Auth: Fail`
 | LAB-WSJP-25 | Tier 1 Jump Box | 192.168.10.60 | 55 | 5 | 50 |
 | LAB-UBTU | Wazuh Manager | 192.168.10.10 | 42 | 1 | 41 |
 
-Those per-host totals sum to 153, but that number overcounts: the same plugin firing on three hosts shows up three times. Deduplicated, the scan found **43 distinct vulnerabilities** across the environment, which is the figure Nessus reports on its Vulnerabilities tab. The gap between 153 and 43 is worth internalizing on its own; per-host findings and unique vulnerabilities are different units, and reporting the wrong one either inflates the problem or hides shared exposure.
+The per-host totals add up to 153, which tripped me up at first, because the Vulnerabilities tab said 43. The difference is that the per-host count lists the same plugin once for every host it fires on, while the Vulnerabilities tab counts each unique vulnerability once. Same scan, two different units. I made a note to always say which one I'm reporting.
 
-Almost all of that is informational service enumeration, the scanner describing what it sees rather than flagging a problem. Setting the noise aside, the scan reduced to **one confirmed, actionable finding**: SMB signing not enforced on the jump box. The other Medium plugin groups (five on the jump box, one on the Wazuh manager) were not individually enumerated in this pass, so I am treating one finding as actionable and the rest as unverified until I have drilled into each. The domain controller showed no Medium findings at all from the uncredentialed view, which given its criticality is a reason to scan it with credentials, not a clean bill of health.
+Almost all of it was informational, just Nessus describing what it found. Once I set that aside, the scan came down to **one confirmed finding I could act on**: SMB signing not required on the jump box. There were other Medium groups (five on the jump box, one on the Wazuh manager) that I didn't drill into on this pass, so I treated those as unverified rather than counting them. The domain controller showed no Medium findings at all from the outside, which, given how important that box is, made me want to scan it with credentials rather than call it clean.
 
-No Critical or High findings appeared on any host. That is consistent with current patch state rather than an absence of vulnerability history: both Windows Servers received the October 2026 cumulative updates (KB5126646, KB5126655) before scanning, which clears the most severe known CVEs from an uncredentialed view.
+No Critical or High findings showed up anywhere. That lines up with patch state more than anything: both Windows Servers had the October 2026 cumulative updates (KB5126646, KB5126655) installed before I scanned.
 
-## The Actionable Finding: SMB Signing Not Required
+## The Finding: SMB Signing Not Required
 
 | Field | Value |
 |-------|-------|
@@ -60,29 +60,29 @@ No Critical or High findings appeared on any host. That is consistent with curre
 | Port | 445/tcp (CIFS) |
 | Exploit Available | Yes, publicly available |
 
-SMB signing is a cryptographic control that verifies SMB packets come from the authenticated source and have not been altered in transit. When signing is not required, an attacker positioned on the network can intercept SMB authentication traffic and relay NTLM credentials to authenticate to other systems without ever cracking a password. This is the attack the Responder toolkit automates, and it is a standard lateral movement technique (MITRE T1557.001).
+SMB signing verifies that SMB traffic actually came from the authenticated sender and wasn't changed on the way. Without it, someone on the network can intercept SMB authentication and relay the NTLM credentials to log in somewhere else, no password cracking needed. That's what tools like Responder automate, and it's a common way to move laterally (MITRE T1557.001).
 
-The vector matters: `AV:N` means network-exploitable by any host that can reach port 445, not just hosts on the same local segment. On a flat lab network, that is every host with a route to the jump box. And the finding is on the jump box specifically, which is the one machine whose entire purpose is to broker privileged administrative sessions. That context is what turns a mid-tier base score into something worth fixing first, which is the next section.
+The `AV:N` in the vector means anything that can reach port 445 can try it, not just machines on the same local segment. And it was on the jump box, the one machine whose whole job is handling admin sessions. That's why I put it at the top of the list even though a 5.3 doesn't sound like much.
 
-## Environmental Re-Scoring
+## Re-Scoring for My Environment
 
-A CVSS Base Score is context-free by design; it describes the vulnerability, not what it would cost *this* organization. The Vulnerability Management workflow is where you add that context, by weighting each asset's Confidentiality, Integrity, and Availability requirements and letting those produce an Environmental Score that reflects real risk. I scored each lab asset deliberately rather than accepting the base numbers.
+A CVSS base score describes the vulnerability on its own, not what it means for a particular environment. So I went through each machine and weighed how much confidentiality, integrity, and availability matter for it, then used that to adjust the scores.
 
-**LAB-WSDC-22, the Domain Controller (Tier 0).** Confidentiality High: it holds every domain credential hash, Kerberos ticket, and GPO. Integrity High: silent modification of AD objects compromises the whole domain. Availability High: domain authentication fails network-wide without it. CIA weight High/High/High. No actionable finding surfaced here on the uncredentialed pass, which given the asset's criticality is a reason to escalate to a credentialed scan, not a reason to relax.
+**LAB-WSDC-22, the domain controller (Tier 0).** Confidentiality High, since it holds every domain credential hash, Kerberos ticket, and GPO. Integrity High, since quietly changing AD objects compromises the whole domain. Availability High, since nobody authenticates without it. That's High/High/High. Nothing actionable showed up from the outside, but with a box this critical, I read that as a reason to scan with credentials, not a reason to relax.
 
-**LAB-WSJP-25, the Jump Box (Tier 1).** Confidentiality High and Integrity High: privileged sessions and administrative credentials flow through it, and a compromise hands an attacker a trusted launch point with valid admin credentials. Availability Medium: administrative access has alternate paths. CIA weight High/High/Medium. The SMB signing finding impacts Integrity (`I:L` in the vector), and with the jump box's Integrity Requirement set to High, the Environmental Score rises above the 5.3 Base. This is why the finding is remediated first despite its unremarkable base number.
+**LAB-WSJP-25, the jump box (Tier 1).** Confidentiality and Integrity High, because privileged sessions and admin credentials pass through it, and owning it gives an attacker a trusted starting point. Availability Medium, since there are other ways to do admin work if it's down. That's High/High/Medium. The SMB signing finding hits Integrity (`I:L` in the vector), and with the jump box's Integrity requirement set to High, the environmental score comes out above the 5.3 base.
 
-**LAB-UBTU, the Wazuh Manager (detection engine).** Confidentiality Medium: the data is internal security telemetry, operationally sensitive rather than regulated. Integrity High: tampering with detection rules or log data blinds the SOC across every monitored host. Availability High: if Wazuh is down, all eight custom detection rules (100002 through 100009) stop firing and the lab goes dark. CIA weight Medium/High/High. One Medium finding was visible here but not captured in full detail this run; it needs drill-down.
+**LAB-UBTU, the Wazuh manager.** Confidentiality Medium, since it's internal security telemetry rather than regulated data. Integrity High, because tampering with rules or logs would blind detection across every monitored host. Availability High, because if it's down, all eight custom rules (100002 through 100009) stop firing. That's Medium/High/High. One Medium finding showed up here that I still need to drill into.
 
-The takeaway is the whole reason the exercise exists: the single highest-priority item is a 5.3 Base Score finding, and it ranks first only because environmental context elevated it. A prioritization process that stopped at the base number would have mis-ranked the most important thing in the scan.
+Working through it that way, the thing that ended up at the top of my list was a 5.3, and it only got there because of the context. If I'd sorted by base score, I would have ranked it wrong.
 
 ![Nessus findings summary across the three lab hosts](../screenshots/cysa-01-findings-summary.png)
 
 ![SMB Signing Not Required, Plugin 57608 detail](../screenshots/cysa-01-smb-signing-finding.png)
 
-## Remediation Plan
+## The Fix
 
-**1. Enforce SMB signing on the jump box (immediate, no downtime).** This is a policy change, not a patch. Via Group Policy:
+This is a policy change, not a patch, and it doesn't need downtime. Through Group Policy on the jump box:
 
 ```
 Computer Configuration → Windows Settings → Security Settings →
@@ -91,37 +91,43 @@ Local Policies → Security Options →
   Microsoft network client: Digitally sign communications (always) → Enabled
 ```
 
-Or directly via PowerShell:
+Or with PowerShell:
 
 ```powershell
 Set-SmbServerConfiguration -RequireSecuritySignature $true -Force
 Set-SmbClientConfiguration -RequireSecuritySignature $true -Force
 ```
 
-Verification: re-run the scan; plugin 57608 should no longer appear on the jump box.
+## Checking That It Worked
 
-**2. Run a credentialed scan against the Domain Controller (high priority, next session).** The DC returned 56 plugin outputs uncredentialed, but that view cannot assess patch level, registry configuration, Kerberos settings, or installed-software CVEs. For a Tier 0 asset weighted High/High/High, an uncredentialed baseline is not an acceptable risk picture on its own. Add a local administrator credential to the scan policy and re-run.
+The next day (October 14), I ran another uncredentialed scan against the jump box and the domain controller to confirm the fix. The Wazuh manager didn't make it into that run, so its status check is still on my list.
 
-**3. Enumerate the remaining Medium groups (follow-on).** The five Medium plugin groups on the jump box and the one on the Wazuh manager were not individually resolved in this pass. Each needs host-level drill-down so any additional actionable findings land in the remediation tracker rather than hiding inside a summary count.
+| Check | Result |
+|-------|--------|
+| Plugin 57608 (SMB signing) | **Gone from both hosts.** Remediation confirmed. |
+| Critical or High findings | None |
+| Total | 33 vulnerabilities across the 2 hosts |
 
-## Verification
+That run also turned up four Medium findings, all SSL/TLS related, on the Windows hosts:
 
-| Action | Method | Expected result |
-|--------|--------|-----------------|
-| SMB signing remediated | Re-run scan, check for plugin 57608 on .60 | Not present |
-| DC credentialed scan | Add credentials to policy, re-run against .50 | Higher count; actionable CVEs visible |
-| Remaining Medium groups enumerated | Host-level drill-down per host | Full finding list documented |
-| Wazuh still healthy | `sudo systemctl status wazuh-manager` on .10 | Active (running) |
+| Finding | Severity | CVSS |
+|---------|----------|------|
+| SSL Certificate Cannot Be Trusted | Medium | 6.5 |
+| SSL Self-Signed Certificate | Medium | 6.5 |
+| TLS Version 1.0 Protocol Detection | Medium | 6.5 |
+| TLS Version 1.1 Deprecated Protocol | Medium | 6.5 |
 
-## What I Learned
+They all come from default Windows Server settings, since services like RDP and WinRM still offer the older TLS versions out of the box. On a production network I'd fix them by disabling TLS 1.0 and 1.1 (with a tool like IIS Crypto or directly in the registry) and putting real certificates in place. In an isolated lab with no outside exposure, I'm accepting them as a known risk for now and writing that down instead of ignoring them.
 
-**An uncredentialed scan measures the perimeter, not the patch state.** The clean Critical/High result is reassuring but partial; it says an outside attacker sees little low-hanging fruit, not that the hosts are well-configured internally. Treating an uncredentialed baseline as a full assessment is a classic way to under-count risk, especially on the asset that matters most. The honest output of this pass is "here is the external exposure, and here is what we still cannot see."
+## What I Took Away
 
-**Base score alone is not prioritization.** The finding that ranked first carries a 5.3 base, and it earned its priority from two context layers the base number omits: a Temporal score of 4.6 driven by a publicly available exploit, and an Environmental adjustment driven by the jump box's High Integrity Requirement. The same scan surfaced the inverse case, a Low-severity finding (CVSS 2.1) carrying an EPSS of 0.32, roughly a 32% modeled probability of exploitation within thirty days. A Low base score with a high EPSS is exactly the kind of item a base-score-only process waves through. Temporal, EPSS, and environmental context each move the ranking, and a defensible prioritization uses all of them.
+**An outside scan tells you about the perimeter, not the patch state.** A clean Critical/High result from an uncredentialed scan felt good, but all it really said was that an attacker on the network wouldn't find easy wins. It didn't say the machines were configured well inside. That was the reason the credentialed scan of the domain controller came next.
 
-**The finding ties back to my detection work.** SMB relay is not an abstract checkbox here; it is the lateral movement path my existing kill-chain lab already instruments. Rules 100004 and 100005 detect explicit credential use and failed network logons arriving at the Tier 0 DC, which is the arrival side of exactly this technique. Enforcing SMB signing closes the vulnerability; the detection rules catch the attempt if it is ever tried. Vulnerability management and detection engineering are the same problem viewed from two ends.
+**I can't prioritize by base score alone.** The finding that ended up on top was a 5.3, and it got there because of two things the base score leaves out: a temporal score of 4.6, since there's a public exploit, and the jump box's high integrity requirement. The scan also had the opposite case, a Low finding (CVSS 2.1) with an EPSS of 0.32, meaning roughly a 32% estimated chance of exploitation in the next thirty days. If I'd only looked at base scores, I would have skipped right past that one.
 
-**The session doubled as targeted study.** Turning a scan into a write-up surfaced concrete follow-up topics worth deliberate reps: NTLM relay mechanics and the Responder workflow, the order of volatility for evidence capture, and the distinctions between SAST, DAST, IAST, and SCA. Running the lab as both practice and study is the design goal of this track; Reporting is 16% of the exam, and writing the finding up is the reporting rep.
+**It connected back to my detection work.** SMB relay is the same lateral movement path my earlier kill-chain lab was built around. Rules 100004 and 100005 catch explicit credential use and failed network logons landing on the domain controller. Turning on SMB signing closes the hole, and the rules still catch the attempt if someone tries. Seeing vulnerability management and detection from both ends of the same attack was the most useful part of this lab for me.
+
+**Writing it up showed me what to study next.** Turning the scan into this writeup made it obvious where I wanted more depth: how NTLM relay actually works step by step, the order of volatility for evidence collection, and the differences between SAST, DAST, IAST, and SCA.
 
 ## Lab Environment
 
@@ -130,14 +136,19 @@ Verification: re-run the scan; plugin 57608 should no longer appear on the jump 
 | Scanner | Nessus Essentials, Basic Network Scan, uncredentialed |
 | Targets | LAB-WSDC-22 (Server 2022 DC), LAB-WSJP-25 (Server 2025 jump box), LAB-UBTU (Ubuntu, Wazuh manager) |
 | Host | VirtualBox on Windows 11 Pro; isolated host-only network (192.168.10.0/24) |
-| Patch state | October 2026 cumulative updates (KB5126646, KB5126655) applied to both Windows Servers pre-scan |
+| Patch state | October 2026 cumulative updates (KB5126646, KB5126655) on both Windows Servers before the scan |
 
-## Up Next
+## What Came Next
 
-- **Credentialed scan of the Domain Controller:** expose the internal configuration and patch-level findings an uncredentialed pass cannot see on the lab's most critical asset.
-- **Remediation verification:** enforce SMB signing on the jump box and re-scan to confirm plugin 57608 clears.
-- **Drill down the MIXED and Medium groups** on both Windows Servers and document anything actionable.
-- **Incident Response session (next CySA+ track lab):** replay the kill chain against these VMs and run a full IR cycle on the existing Wazuh detections, moving from the Vulnerability Management domain into Incident Response and Management.
+- **[cysa-03](cysa-03-dc-credentialed-scan.md):** the credentialed scan of the domain controller that this baseline pointed toward.
+- **[cysa-05](cysa-05-ir-capstone.md):** the incident response capstone that replayed the kill chain against these same machines.
+
+Still on my list from this one:
+
+- Drill into the remaining Medium groups on both Windows Servers and the Wazuh manager.
+- Disable LLMNR and NBT-NS, which go hand in hand with SMB signing.
+- Confirm SMB signing is actually enforced on the domain controller instead of assuming the default policy covers it.
+- Check Wazuh service status on LAB-UBTU, which missed the verification run.
 
 ---
 
