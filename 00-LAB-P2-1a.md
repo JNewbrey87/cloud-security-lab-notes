@@ -14,7 +14,7 @@ Phase 1 left me with a working on-prem detection stack: four custom Wazuh rules,
 
 Azure Arc is how you do that. The Arc agent runs on each on-prem machine and registers it in Azure as a managed resource, which makes it a target for Azure Policy, Defender for Cloud, and eventually Sentinel. Standing up cloud resources is familiar territory for me from work, but treating my own on-prem VMs as Azure-managed assets, and then reading their security posture through a benchmark, was the part I wanted the reps on. This lab covers the Arc onboarding, governance tagging, the Microsoft Cloud Security Benchmark (MCSB) baseline, an Entra ID posture check, and one debugging lesson about which Azure view you can actually trust.
 
-> **Update (October 2026):** the `rg-security-lab` resource group described here was later deleted during a separate cloud forensics lab (see [cysa-04](CySA/cysa-04-azure-vm-forensic-snapshot.md)), which removed the Arc registrations and the policy assignments below. Re-onboarding these machines to Arc, in a dedicated resource group this time, is on my list. Everything in this writeup reflects the state during the June 2026 session.
+> **Update (October 2026):** the `rg-security-lab` resource group described here was later deleted during a separate cloud forensics lab (see [cysa-04](CySA/04-cysa-azure-vm-forensic-snapshot.md)), which removed the Arc registrations and the policy assignments below. Re-onboarding these machines to Arc, in a dedicated resource group this time, is on my list. Everything in this writeup reflects the state during the June 2026 session.
 
 ## Architecture
 
