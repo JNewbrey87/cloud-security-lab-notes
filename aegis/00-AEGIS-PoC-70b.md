@@ -1,189 +1,137 @@
-# AEGIS PoC Run 2: llama3.3:70b Adversarial Simulation
+# Credentialed Vulnerability Scanning: Finding What the Perimeter Cannot See
 
-**Project:** AEGIS (Adaptive Execution and Generative Intelligence System)  
-**Type:** Local AI Red Team / Blue Team simulation, proof of concept  
-**Platform:** ASUS ROG Flow Z13 (ZX-A3G15), WSL2 Ubuntu, ROCm  
-**Date:** June 2026  
+**Project:** CySA+ Lab Track, Vulnerability Management  
+**Session:** 03 | **Platform:** VirtualBox on Windows 11 Pro, isolated host-only network  
+**Target:** LAB-WSDC-22 (Windows Server 2022, Tier 0 Domain Controller, lab.local)  
+**Tool:** Nessus Essentials, credentialed Basic Network Scan  
+**MITRE ATT&CK (relevance):** [T1553.002 — Subvert Trust Controls: Code Signing](https://attack.mitre.org/techniques/T1553/002/)  
+**Cert Alignment:** CySA+ CS0-004, Domain 2 (Vulnerability Management): authenticated scanning, finding triage, remediation, verification  
+**Date:** October 2026  
 
 ---
 
-## About AEGIS
-
-AEGIS is my local Red Team / Blue Team AI simulation: one AI agent attacks, another defends, and all of the inference runs on my own hardware. No cloud API, no metered tokens, nothing leaving the machine. It's personal research, not a production system.
-
-Most of it is an extension of my thesis work. My master's thesis, the [Cloud Forensic Readiness and Preservation Framework (CFRPF)](https://github.com/JNewbrey87/CFRPF), is about preserving evidence in cloud environments, including what automated systems decided and why. AEGIS is where I try those ideas in code. The rest is that I wanted to toy with AI past just chatting with a model, and learn how to build a stack of agents that actually work together. It's also adjacent to my day job, where I'm looking into newly-added AI agents.
-
-I don't know what I don't know about agentic AI yet, so the approach is the same as the rest of this repo: build the thing, run it, watch where it breaks, and write down what I learned. The AEGIS files are numbered in the order I did them, starting here.
-
 ## Why I Did This One
 
-Run 1 used llama3:8b to prove the stack worked. The framework ran, both agents finished their tasks, and I had a baseline. For Run 2, I moved up to llama3.3:70b, about 42 GB of weights, to answer one question: does the bigger model produce better security analysis, or just longer output?
+In my [first lab in this series](01-cysa-vuln-management-baseline.md), I ran an uncredentialed Nessus scan against my homelab, and my domain controller came back clean: 56 findings, all informational. I wasn't sure I trusted that, since an uncredentialed scan can only see what's exposed from the outside.
 
-The short answer is better, and the difference shows most in the Blue Team's defensive recommendations.
+Vulnerability scanning and patching are already part of my infrastructure work, so a credentialed Nessus scan wasn't new to me. What I wanted from this lab was the part that tends to get skipped when you're working through a patch queue: slowing down on one finding to understand why it actually matters, proving the fix with a controlled re-scan instead of trusting a single pass, and checking the host's own logs to see what the scanner really did on the box.
 
-## Stack
+## Scan Configuration
 
-| Component | Detail |
-|-----------|--------|
-| Model | llama3.3:70b (42 GB weights) |
-| Inference backend | ROCm (AMD Radeon 8060S, unified memory) |
-| Agent framework | CrewAI 1.14.6 |
-| Runtime | Python 3.12, WSL2 Ubuntu (aegis-env-312 venv) |
-| Ollama endpoint | localhost:11434 (WSL mirrored networking) |
-| Tracing | Disabled; defaulted off after a 20-second prompt timeout |
+| Field | Value |
+|-------|-------|
+| Policy | Basic Network Scan, Windows credentialed (password auth) |
+| Target | LAB-WSDC-22 (192.168.10.50) |
+| Account | Domain Administrator (lab shortcut, see below) |
+| Remote Registry | Started by Nessus for every run; disabled on the DC at 12:13:16 before the control scan; Nessus restored the disabled start type afterward (confirmed in the Service Control Manager log) |
 
-## What I Built
+Two shortcuts I want to be upfront about, since scanning a Tier 0 machine is as much about how you do it as what you find.
 
-The crew is two agents running in sequence on a shared threat scenario.
+First, I used a Domain Admin account and scanned the DC from the next segment over. That breaks Tier 0 separation, and it's a lab shortcut, not how I'd do it for real. A production setup would use a dedicated least-privilege scan account with only the rights Nessus needs (Remote Registry read, WMI, specific SMB access), and run the scanner from inside the Tier 0 boundary.
 
-**Red Team Analyst** gets a target environment and has to identify attack vectors at the technique level. Category answers like "SQL injection" don't satisfy the `expected_output`; the agent has to describe how the technique works and what the attacker gains.
+Second, a Windows credentialed scan relies on the Remote Registry service to read local configuration. I disabled it on the DC at 12:13:16, before the control scan described below, to see whether that would block the scan. It didn't. Nessus starts Remote Registry when it needs it, runs the scan, and sets the start type back to how it found it when it's done. That means Nessus does change the target while it scans, but the footprint is small and I was able to document it from the DC's own logs.
 
-**Blue Team Analyst** receives the Red Team's output and answers each vector with one detection rule and one defensive control. One answer per vector, not a laundry list.
+## What Credentials Turned Up
 
-That constraint is the point. Forcing the Blue Team agent to commit to a single detection per vector shows whether the model understands which control actually closes the gap, or whether it's pattern-matching to a checklist. The 8b run exposed this; the 70b answered it.
+The credentialed scan came back with 52 findings, including one HIGH. The uncredentialed baseline had 56, all informational. At a glance, the drop from 56 to 52 looks like the credentialed scan weeding out noise, but that's not what happened. Credentialed and uncredentialed scans run different sets of plugins, so the count moved because the mix changed. A plugin-by-plugin comparison would show exactly what changed, but Nessus Essentials won't export scans (that's a Professional feature), so I captured the results with screenshots and notes instead. What I can say for sure is the part that matters: the HIGH finding wasn't in the uncredentialed scan at all, because you can only see it from inside the box.
 
-```python
-from crewai import Agent, Task, Crew, LLM
+## The HIGH Finding: CVE-2013-3900
 
-llm = LLM(model="ollama/llama3.3:70b", base_url="http://localhost:11434")
+| Field | Value |
+|-------|-------|
+| Plugin ID | 166555 (type: local) |
+| Title | WinVerifyTrust Signature Validation (EnableCertPaddingCheck) |
+| CVSS v3 | 8.8 |
+| VPR | 9.5 |
+| EPSS | 0.4465 |
+| CISA KEV | Yes, added 2022-01-10 (BOD 22-01) |
 
-red_agent = Agent(
-    role="Red Team Analyst",
-    goal="Identify attack vectors against a target system",
-    backstory="You are an adversarial security analyst who thinks like an attacker.",
-    llm=llm,
-    verbose=True
-)
+By default, Windows doesn't strictly validate the structure of Authenticode-signed files. The fix is two registry values, and neither existed on the DC:
 
-blue_agent = Agent(
-    role="Blue Team Analyst",
-    goal="Detect and counter attack vectors identified by the Red Team",
-    backstory="You are a defensive security analyst. You receive threat intel from Red Team and build detection rules in response.",
-    llm=llm,
-    verbose=True
-)
-
-red_task = Task(
-    description="Identify three realistic attack vectors against a cloud-hosted web application with user authentication. Be specific about technique, not just category.",
-    expected_output="Three attack vectors, each with: technique name, how it works, and what the attacker gains.",
-    agent=red_agent
-)
-
-blue_task = Task(
-    description="For each attack vector the Red Team identified, propose one detection rule and one defensive control.",
-    expected_output="A response for each of the three vectors: detection rule + defensive control.",
-    agent=blue_agent
-)
-
-crew = Crew(agents=[red_agent, blue_agent], tasks=[red_task, blue_task], verbose=True)
-result = crew.kickoff()
+```
+HKLM\Software\Microsoft\Cryptography\Wintrust\Config\EnableCertPaddingCheck
+HKLM\Software\Wow6432Node\Microsoft\Cryptography\Wintrust\Config\EnableCertPaddingCheck
 ```
 
-## Hardware During Inference
+Without them, someone can take a validly signed executable, stuff extra malicious content into its padding, and it still passes signature checks. A user has to run the file, so it doesn't spread on its own, but it's on CISA's Known Exploited Vulnerabilities list, so it's being used in real attacks. Microsoft made the fix opt-in because strict checking can break some legitimately signed third-party installers, which is why on a production DC I'd test it before rolling it out.
 
-The Z13 has one 128 GB LPDDR5X memory pool shared between the CPU and GPU. At the time, the dedicated graphics setting was about 64 GB, and I assumed that was the ceiling the model had to fit under. I later learned that's not how it works on this machine: ROCm draws on the wider unified pool, so the setting isn't the real limit (more on that in [aegis-03](aegis-03-gpu-cpu-fallback.md)).
+The reason only the credentialed scan caught it is the plugin type. 166555 is a local check that reads the registry directly. An uncredentialed scanner can't look at the registry at all; it can only guess at configuration from how the machine behaves on the network. So this whole category of finding, registry values, local policy, installed software versions, is invisible without credentials.
 
-What the run looked like:
+## Why This One Went to the Top
 
-- **GPU compute:** 100%, with a sawtooth pattern on the Compute 0 lane, which is what active transformer inference looks like
-- **Dedicated GPU memory:** 42.5 GB at model load, growing to 53.0 GB by the end of the run as the KV cache filled
-- **System RAM:** about 60 of 63.6 GB (94%)
-- **GPU temperature:** 81°C sustained, within spec for full-load inference on this chassis
-- **CPU:** about 10%, just CrewAI orchestration
+This CVE is from 2013 and had been sitting on this machine unmitigated the whole time. It's a good example of why I don't prioritize on base score alone. CVSS 8.8 describes how bad it could be. EPSS at 0.4465, which comes from FIRST's Exploit Prediction Scoring System (Nessus displays it but doesn't calculate it), estimates roughly a 44% chance of exploitation in the next thirty days. Add the VPR of 9.5 and the KEV listing, and it's clearly being exploited out there. An old CVE that's actively exploited should outrank a newer one with a scarier base score and a low EPSS.
 
-The near-idle CPU confirmed ROCm was doing the inference instead of falling back to the processor. That was the thing I was watching for. On the 8b run I couldn't be completely sure the GPU was doing the work; this run showed it plainly.
+## The Fix
 
-## The Threat Scenario
+The `Wintrust\Config` key didn't exist under either path, so I had to create it before I could set the value, on both the 64-bit and the 32-bit (Wow6432Node) side:
 
-**Target:** cloud-hosted web application with user authentication  
-**Red Team task:** three realistic attack vectors at technique-level specificity  
-**Blue Team task:** for each vector, one detection rule and one defensive control
+```powershell
+New-Item -Path "HKLM:\Software\Microsoft\Cryptography\Wintrust\Config" -Force
+New-ItemProperty -Path "HKLM:\Software\Microsoft\Cryptography\Wintrust\Config" `
+  -Name "EnableCertPaddingCheck" -Value 1 -PropertyType DWORD -Force
 
-## Red Team Output
+New-Item -Path "HKLM:\Software\Wow6432Node\Microsoft\Cryptography\Wintrust\Config" -Force
+New-ItemProperty -Path "HKLM:\Software\Wow6432Node\Microsoft\Cryptography\Wintrust\Config" `
+  -Name "EnableCertPaddingCheck" -Value 1 -PropertyType DWORD -Force
+```
 
-### Vector 1: JWT Injection via Malformed Token Payload
+Both came back `EnableCertPaddingCheck : 1`. On a production DC this would go through a change request with a rollback plan and compatibility testing first, because of the installer-breakage risk. In the lab I could just apply it and see what happened.
 
-**Technique:** manipulate the JWT payload to carry a valid username with a wrong or missing password, exploiting weak or missing signature validation on the server. The attacker sends crafted tokens whose header specifies `alg: none`, bypassing signature checks on servers that accept unsigned tokens.
+## Proving It: A Control Scan, Then Verification
 
-**Attacker gain:** an authenticated session without valid credentials; the attacker can impersonate any user whose username is known, including admins.
+I didn't want to just re-scan once and call it fixed. If something else changed between scans, a clean result wouldn't prove the registry fix did anything. So I ran three credentialed scans, and the middle one was a control.
 
-### Vector 2: Stored XSS via Unvalidated Search Input
+The first scan (11:41 to 12:00) found CVE-2013-3900. Before fixing anything, I disabled Remote Registry on the DC at 12:13:16 and ran a second scan (12:14 to 12:30). The question I wanted that run to answer was whether the finding would still show up with Remote Registry disabled beforehand and Nessus starting it on its own. It did: same 52 findings as the first run, CVE-2013-3900 included. So the finding was real, and I had my scan conditions locked in.
 
-**Technique:** inject persistent JavaScript into a search field with no server-side input validation. The script is stored in the database and runs in the browser of every later user who loads the affected page or results.
+Then I applied the fix (around 12:38) and ran the verification scan (12:40 to 12:56) under exactly the same conditions as the control. This time CVE-2013-3900 was gone, and the total dropped from 52 to 50, all informational. Since the control and the verification only differed in one way, the registry fix, I could say the fix is what made the finding go away, not something about how the scan ran.
 
-**Attacker gain:** session cookie theft, account hijacking, and actions taken as other users, including privileged ones.
+| Scan | Window | Total | CVE-2013-3900 | Remote Registry |
+|------|--------|-------|---------------|-----------------|
+| cysa-01, uncredentialed baseline | prior session | 56 | not visible (uncredentialed) | n/a |
+| Credentialed, initial | 11:41–12:00 | 52 | present | started by Nessus |
+| Credentialed, control | 12:14–12:30 | 52 | present | disabled beforehand; started by Nessus |
+| Credentialed, verification | 12:40–12:56 | 50 (all INFO) | absent | disabled beforehand; started by Nessus |
 
-### Vector 3: SSRF via Misconfigured Proxy
+### Checking the DC's Own Logs
 
-**Technique:** send requests through a misconfigured proxy to reach internal services, cloud metadata endpoints (such as `169.254.169.254`), or RFC 1918 address space that was never meant to be reachable from the application tier.
+I didn't want to just take Nessus's word for how it handled Remote Registry, so I checked the DC's Service Control Manager events:
 
-**Attacker gain:** access to internal services and databases, cloud instance metadata including IAM credentials, and lateral movement into otherwise isolated segments.
+```powershell
+Get-WinEvent -LogName System |
+  Where-Object { $_.Id -in 7036,7040 -and $_.Message -match "Remote Registry" } |
+  Select-Object TimeCreated, Id, Message | Format-List
+```
 
-## Blue Team Output
-
-### Response to Vector 1: JWT Injection
-
-**Detection rule:** alert on more than 5 failed logins in 60 seconds from one source IP. Separately, flag any inbound JWT whose header specifies `alg: none` or whose payload doesn't match the expected schema.
-
-**Defensive control:** enforce server-side JWT signature verification and reject any token specifying `alg: none`. Rate-limit every authentication endpoint. Use a vetted JWT library rather than a custom parser.
-
-### Response to Vector 2: Stored XSS
-
-**Detection rule:** watch web application logs for search queries containing XSS indicators like `<script>`, `javascript:`, `onload=`, and `onerror=`. Send matches to the alert queue for analyst review instead of relying only on WAF blocking.
-
-**Defensive control:** input validation and output encoding on every user-supplied field. A WAF ruleset for XSS as a second layer, not the primary control. Content Security Policy headers to limit impact if an injection gets through anyway.
-
-### Response to Vector 3: SSRF via Proxy
-
-**Detection rule:** watch proxy logs for outbound requests to non-allowlisted domains, any RFC 1918 destination (`10.x`, `172.16-31.x`, `192.168.x`), and cloud metadata addresses (`169.254.169.254`). Alert on unusual routing regardless of response code.
-
-**Defensive control:** restrict the proxy to an allowlist of destinations. Add egress filtering at the network layer as a separate enforcement point that doesn't depend on the proxy config. Segment the internal network to limit the blast radius if SSRF works anyway.
-
-## 8b vs. 70b: What the Upgrade Changed
-
-| Dimension | llama3:8b (Run 1) | llama3.3:70b (Run 2) |
-|-----------|-------------------|----------------------|
-| Attack vector specificity | Category level ("XSS attack," "brute force") | Technique level: mechanism, payload path, specific attacker gain |
-| JWT vector | Named the class of attack | Named the `alg: none` bypass as the exploitation path |
-| Blue Team defensive depth | One surface-level control | Layered controls, with reasoning about primary vs. secondary enforcement |
-| SSRF response | "Fix the proxy configuration" | Egress filtering independent of the proxy, segmentation, metadata endpoint coverage |
-| KV cache growth | Minimal | About 10 GB (42.5 to 53 GB) |
-| Speed | Faster | Slower per token; the depth of the output was worth it |
-
-The SSRF answer shows the difference best. The 8b model answered at the level of the misconfiguration: fix the proxy. The 70b model answered at the level of the threat: assume the proxy can be bypassed or misconfigured again, and build controls that don't depend on it being right. Egress filtering plus segmentation is layered defense, not a config patch, and that's the kind of answer that holds up under review.
+Event ID 7040 logs changes to a service's start type, and 7036 logs a service starting and stopping. Together they showed Remote Registry starting up around each scan and its start type going back to disabled afterward. That matched what I expected, and now I had the host's own record of it. It's the same habit as checking Event ID 1074 for `shutdown.exe` in my memory capture lab: if a tool's behavior matters to your conclusion, confirm it from the machine's logs.
 
 ## What I Took Away
 
-**Model scale changed the quality of the reasoning, not just the length.** The 70b answers weren't longer versions of the 8b answers; they were built differently. The 8b named threat categories and prescribed the most obvious single fix. The 70b reasoned about the threat and prescribed controls that still hold if the simple fix fails. In security work, where layered defense means never trusting one control, that difference matters.
+**A clean outside scan doesn't mean a clean machine.** The DC looked spotless from the outside and had a KEV-listed HIGH on the inside. The uncredentialed scan wasn't wrong. It was answering a narrower question than I first gave it credit for.
 
-**KV cache growth isn't a measure of reasoning.** I originally read the roughly 10 GB of cache growth as a sign of longer reasoning chains. Looking back, that doesn't hold up. The KV cache grows with the amount of context the model is holding, and a 70b model needs more cache per token than an 8b model anyway, so the two numbers can't be compared as evidence of quality. What the growth does show is the model holding more context as the run goes on, and that the memory budget for a 70b run has to account for it, not just the weights.
+**Exploitation likelihood matters as much as the base score.** The finding that mattered most was an old CVE that's actively exploited. I only ranked it correctly because I looked at EPSS, VPR, and the KEV listing alongside the CVSS score.
 
-**ROCm was doing the work.** Compute 0 at 100% with the sawtooth pattern, and the CPU around 10% the whole time, settled whether inference was GPU-accelerated. A 42 GB model running fully in GPU-addressable memory is something most machines can't do without a very large discrete card.
+**How you scan is part of the result.** The Domain Admin shortcut and what Nessus does to Remote Registry aren't side notes. If a scanning setup ignores how it logs in and what it leaves running, it's just traded one exposure for another. Checking the DC's logs is how I confirmed Nessus put things back the way it found them.
 
-**Constrained tasks surface what a model can actually do.** Asking for one detection and one control per vector, instead of "how would you defend against this," forced the Blue Team agent to make a decision. That decision was what I was actually measuring. With an open-ended prompt, both models would have produced similar-looking lists, and the gap in depth would have stayed hidden.
+**The control scan is what makes the verification hold up.** The fix itself was two registry values. The scan sequence is what proves those values closed the finding, and the control run is what rules out anything else explaining the result.
 
 ## Lab Environment
 
 | Component | Details |
 |-----------|---------|
-| Host | ASUS ROG Flow Z13 (ZX-A3G15): Ryzen AI Max+ 395, Radeon 8060S, 128 GB unified memory |
-| Runtime | WSL2 Ubuntu, Python 3.12 venv |
-| Inference | Ollama with ROCm, llama3.3:70b |
-| Orchestration | CrewAI 1.14.6, two sequential agents |
-| Network | Local only; no cloud API calls |
+| Target | LAB-WSDC-22, Windows Server 2022, Tier 0 DC, lab.local forest |
+| Scanner | Nessus Essentials, Local Scanner on LAB-KALI, credentialed Basic Network Scan |
+| Credential | Domain Administrator (documented lab shortcut; least-privilege account is the production pattern) |
+| Network | Isolated host-only VirtualBox network (192.168.10.0/24), no external exposure |
 
 ## What Came Next
 
-Looking back, the "up next" list I wrote after this run was more ambitious than what I actually did. What I really did next:
+- **[cysa-04](04-cysa-azure-vm-forensic-snapshot.md):** cloud forensic acquisition on an Azure VM, carrying the evidence work from my memory capture lab into the cloud.
+- **[cysa-05](05-cysa-ir-capstone.md):** the incident response capstone, which pulled this and the other labs into one incident.
 
-- **[aegis-01](aegis-01-crewai-migration.md):** setting the full stack back up on this machine, migrating the PoC script to CrewAI 1.x, and recovering from a broken Ollama update.
-- **[aegis-02](aegis-02-evidence-ledger.md):** a tamper-evident evidence ledger that records what each agent decided and why. My original idea of "automating run logging" grew into this.
-- **[aegis-03](aegis-03-gpu-cpu-fallback.md):** finding out the 70b model had quietly fallen back to the CPU, and why.
+Still on my list from this one:
 
-Ideas from the original list I haven't gotten to:
-
-- A Blue Team run on a code-focused model (qwen2.5-coder) to see whether it produces structured Sigma rules instead of plain-language controls.
-- Broader scenarios beyond a web app with authentication, such as ICS/OT, cloud-native misconfigurations, and supply chain.
+- Set up a dedicated least-privilege scan account for future credentialed scans. On a DC that needs an AD-based approach rather than a local group.
+- Do the plugin-by-plugin comparison between the uncredentialed and credentialed scans, which needs the Professional tier or an API workaround.
 
 ---
 
