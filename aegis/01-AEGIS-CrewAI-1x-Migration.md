@@ -3,7 +3,7 @@
 **Project:** AEGIS (Adaptive Execution and Generative Intelligence System)  
 **Type:** Engineering note: framework migration and runtime recovery  
 **Platform:** ASUS ROG Flow Z13 (ZX-A3G15), WSL2 Ubuntu, ROCm  
-**Date:** July 2026  
+**Date:** July 2026
 
 ---
 
@@ -98,7 +98,7 @@ With the stack rebuilt, the crew ran clean end to end, and both agents produced 
 
 At the time, my takeaway was that a fully local, multi-agent pipeline could produce paired offense and defense reasoning at usable specificity with no outside dependency.
 
-> **Retrospective note (October 2026):** looking back at this run after the [evidence ledger](aegis-02-evidence-ledger.md) work, the specific rule references the Blue Team gave (Wazuh rule 100140, Snort rule 12001, and a KQL rule named `custom_rule_session_hijack_001`) appear to be invented by the model, not real rules. I didn't check them against real rule sets at the time. The detection logic is reasonable; the rule IDs aren't something you could deploy. That's the same "correct logic, invented syntax" pattern the ledger later preserved on purpose.
+> **Retrospective note (October 2026):** looking back at this run after the [evidence ledger](02-AEGIS-Evidence-Ledger.md) work, the specific rule references the Blue Team gave (Wazuh rule 100140, Snort rule 12001, and a KQL rule named `custom_rule_session_hijack_001`) appear to be invented by the model, not real rules. I didn't check them against real rule sets at the time. The detection logic is reasonable; the rule IDs aren't something you could deploy. That's the same "correct logic, invented syntax" pattern the ledger later preserved on purpose.
 
 ## What I Took Away
 
@@ -122,10 +122,10 @@ At the time, my takeaway was that a fully local, multi-agent pipeline could prod
 
 ## What Came Next
 
-- **[aegis-02](aegis-02-evidence-ledger.md):** a tamper-evident evidence ledger that records what each agent decided and why.
-- **[aegis-03](aegis-03-gpu-cpu-fallback.md):** some time after this, the 70b model quietly fell back to the CPU; that file covers how I found it and why.
+- **[aegis-02](02-AEGIS-Evidence-Ledger.md):** a tamper-evident evidence ledger that records what each agent decided and why.
+- **[aegis-03](03-AEGIS-GPU-Investigation.md):** some time after this, the 70b model quietly fell back to the CPU; that file covers how I found it and why.
 
-Back to the start: [aegis-00](aegis-00-poc-70b.md).
+Back to the start: [aegis-00](00-AEGIS-PoC-70b.md).
 
 ---
 
