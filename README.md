@@ -46,10 +46,10 @@ AEGIS is my local Red Team / Blue Team AI simulation, running entirely on my own
 
 | Lab | Maps To |
 |-----|---------|
-| [AEGIS PoC Run 2: llama3.3:70b Adversarial Simulation](aegis/AEGIS-PoC-70b.md) | Model scale and security reasoning quality |
-| [Migrating the PoC to CrewAI 1.x and Validating the Six-Model Stack](aegis/AEGIS-CrewAI-1x-Migration.md) | Local inference operations; recovering a broken runtime |
-| [AEGIS Evidence Ledger: Tamper-Evident Custody for Agent Decisions](aegis/AEGIS-Evidence-Ledger.md) | CFRPF Immutable Evidence Preservation; AI Auditability |
-| [The GPU That Was Never On](aegis/AEGIS-GPU-Investigation.md) | Silent failure in local inference; verifying what the system reports |
+| [AEGIS PoC Run 2: llama3.3:70b Adversarial Simulation](aegis/aegis-00-poc-70b.md) | Model scale and security reasoning quality |
+| [Rebuilding the Stack on New Hardware and Migrating to CrewAI 1.x](aegis/aegis-01-crewai-migration.md) | Local inference operations; recovering a broken runtime |
+| [AEGIS Evidence Ledger: Tamper-Evident Custody for Agent Decisions](aegis/aegis-02-evidence-ledger.md) | CFRPF Immutable Evidence Preservation; AI Auditability |
+| [Silent CPU Fallback: Why My 70B Model Stopped Using the GPU](aegis/aegis-03-gpu-cpu-fallback.md) | Silent failure in local inference; verifying what the system reports |
 
 ## Vulnerability Management, Forensics, and Incident Response (CySA+ Track)
 
