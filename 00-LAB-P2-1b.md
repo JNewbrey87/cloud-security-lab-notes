@@ -1,52 +1,44 @@
-# SSH Brute Force Detection + Active Response — Ubuntu 25.04, PAM Log Path
+# Lab 2b: Rebuilding SSH Brute Force Detection for Ubuntu 25.04, Plus Active Response
 
-**Project:** P2 — Azure Integration and Cloud Detection Engineering
-**Phase:** 2-1b | **Platform:** VirtualBox on Windows 11 Pro (ZX-A3G15)
-**MITRE ATT&CK:** [T1110 — Brute Force](https://attack.mitre.org/techniques/T1110/) / [T1110.001 — Password Guessing](https://attack.mitre.org/techniques/T1110.001/) / [T1136.001 — Create Account: Local Account](https://attack.mitre.org/techniques/T1136/001/) / [T1543.003 — Windows Service](https://attack.mitre.org/techniques/T1543/003/)
-**Cert Alignment:** CySA+ CS0-004, SC-200
-**Date Completed:** July 2026
-
----
-
-## Scenario
-
-Lab 1b validated SSH brute force detection on Ubuntu 22.04 under Hyper-V, with rule 100003 keyed off rule 5700 — the standard Wazuh decoder for sshd authentication failures. Phase 2 moved the lab to VirtualBox on ZX-A3G15, and the detection silently stopped working.
-
-Ubuntu 25.04 ships with `sshd-session` as the process that handles authentication. Unlike the classic `sshd` process, `sshd-session` routes failed authentication through the PAM subsystem. PAM failure events decode differently in Wazuh — they hit rule 2502 ("User missed the password more than one time"), not the sshd rules (5700, 5710) that rule 100003 was built on. Hydra ran cleanly. Wazuh saw nothing.
-
-This lab re-establishes SSH brute force detection on the current platform, resolves the log path mismatch with a diagnostic-first approach via `wazuh-logtest`, and adds automated countermeasures via Wazuh Active Response. Three additional Windows detection rules covering persistence and account lockout were written in parallel during the same session.
+**Project:** P2, Azure Integration and Cloud Detection Engineering  
+**Phase:** 2-1b | **Platform:** VirtualBox on Windows 11 Pro (ZX-A3G15)  
+**MITRE ATT&CK:** [T1110 — Brute Force](https://attack.mitre.org/techniques/T1110/), [T1110.001 — Password Guessing](https://attack.mitre.org/techniques/T1110/001/), [T1136.001 — Create Account: Local Account](https://attack.mitre.org/techniques/T1136/001/), [T1543.003 — Create or Modify System Process: Windows Service](https://attack.mitre.org/techniques/T1543/003/)  
+**Cert Alignment:** CySA+ CS0-004, Domain 1 (Security Operations); SC-200  
+**Date:** July 2026  
 
 ---
+
+## Why I Did This One
+
+Back in Lab 1b, I built an SSH brute force rule that worked on Ubuntu 22.04. When I rebuilt the lab on new hardware with a newer Ubuntu, that rule quietly stopped firing. Nothing errored. Hydra ran, and Wazuh just sat there. A detection that silently dies is worse than no detection, because you think you're covered, so I wanted to track down exactly why it broke and fix it. Then I wanted to go one step further than I had before and have Wazuh actually respond to the attack on its own, not just alert on it.
 
 ## Architecture
 
 ```
-[LAB-KALI — Attacker]                   [LAB-UBTU — Wazuh Manager + SSH Target]
-  192.168.10.30                            192.168.10.10, Ubuntu 25.04
-  Hydra SSH brute force  ──────────────►   sshd-session → PAM → rule 2502
-                                                 │
-                                           Rule 100009 (single failure, rhost= field)
-                                                 │
-                                           Rule 100003 (3+ hits, 60s, same IP)
-                                                 │
-                                        Active Response: firewall-drop, 180s timeout
-  LAB-KALI BLOCKED ◄──────────────────── iptables DROP → 192.168.10.30
+[LAB-KALI: Attacker]                    [LAB-UBTU: Wazuh Manager + SSH Target]
+  192.168.10.30                           192.168.10.10, Ubuntu 25.04
+  SSH brute force         ──────────────► sshd-session → PAM → rule 2502
+                                               │
+                                          Rule 100009 (single failure, rhost= field)
+                                               │
+                                          Rule 100003 (3+ hits in 60s, same IP)
+                                               │
+                                       Active Response: firewall-drop, 180s
+  LAB-KALI BLOCKED        ◄────────────── iptables DROP → 192.168.10.30
 ```
 
-> All VMs run on an isolated host-only VirtualBox network. The 192.168.10.x addresses are not externally reachable. Real usernames and wordlist paths are omitted.
-
----
+Everything runs on the isolated host-only VirtualBox network. The 192.168.10.x addresses aren't reachable from outside.
 
 ## What I Built
 
-### 1. Diagnosed the Ubuntu 25.04 Log Path Difference
+### 1. Tracking Down Why the Rule Went Silent
 
-The first symptom was that Hydra ran without triggering any Wazuh alerts. Two things were happening in combination.
+The symptom was that an SSH brute force produced no Wazuh alerts at all. Two separate things were stacking up.
 
-**Problem 1 — PerSourcePenalties:** Ubuntu 25.04 sshd enables connection-rate penalties by default. When a source IP accumulates failed connections, subsequent connections are rejected at the transport layer before any authentication attempt is logged. No auth event, no PAM failure, no Wazuh event. Fix:
+**PerSourcePenalties.** Ubuntu 25.04's sshd turns on connection-rate penalties by default. Once a source IP racks up failed connections, sshd starts rejecting new connections at the transport layer before authentication even happens. No auth attempt means no log, which means nothing for Wazuh to catch. I turned it off for the lab:
 
-**In `/etc/ssh/sshd_config` on LAB-UBTU:**
 ```
+# /etc/ssh/sshd_config on LAB-UBTU
 PerSourcePenalties no
 ```
 
@@ -54,30 +46,19 @@ PerSourcePenalties no
 sudo systemctl restart ssh
 ```
 
-**Problem 2 — sshd-session PAM log path:** With PerSourcePenalties disabled, Hydra's attempts now reach the authentication layer and generate PAM failure events. But those events do not match the sshd decoder chain that rule 5700 expects. To find the actual rule path, paste a real failure line from `/var/log/auth.log` into `wazuh-logtest`:
+**The PAM log path.** With that disabled, the attempts reached authentication and started logging, but they still didn't match my rule. Ubuntu 25.04 uses `sshd-session`, which routes failures through PAM, and those events don't decode the way the old `sshd` ones did. To find what they actually hit, I pasted a real failure line from `/var/log/auth.log` into `wazuh-logtest`:
 
 ```bash
 sudo /var/ossec/bin/wazuh-logtest
 ```
 
-A sample PAM failure line looks like:
-```
-Jun  5 10:12:34 lab-ubtu sshd-session[1234]: pam_unix(sshd:auth): authentication failure; logname= uid=0 euid=0 tty=ssh ruser= rhost=192.168.10.30 user=testuser
-```
+It resolved to **rule 2502** ("User missed the password more than one time"), not rules 5700 or 5710 that my old rule was built on. That was the answer: my parent rule had to change from 5700 to 2502.
 
-`wazuh-logtest` resolves this to **rule 2502** — "User missed the password more than one time." Rule 5700 and rule 5710 never appear in the chain. This confirms the parent SID for rule 100003 must change from `5700` to `2502`.
+### 2. Rule 100009: Catching the Single-Failure PAM Format
 
----
-
-### 2. Rule 100009 — Intermediate Single-Failure Decoder (Ubuntu 25.04 PAM Format)
-
-Some PAM failure events on Ubuntu 25.04 include a `rhost=` field carrying the attacker's source IP in a format that maps to rule 5711. Rule 100009 captures this specific case — a single-failure event with explicit remote host attribution — as a supplementary decoder alongside rule 2502:
+Some of the 25.04 PAM failures come through as a single-failure event carrying a `rhost=` field with the source IP, which maps to rule 5711. I added rule 100009 to capture that case as a supplement to rule 2502:
 
 ```xml
-<!-- Rule 100009: SSH auth failure with remote host attribution (Ubuntu 25.04 PAM format) -->
-<!-- Catches sshd-session PAM events where rhost= is present in the log line -->
-<!-- Parent: rule 5711; match: rhost= field present -->
-<!-- Acts as diagnostic supplement for the Ubuntu 25.04 PAM log path -->
 <rule id="100009" level="5">
   <if_sid>5711</if_sid>
   <match>rhost=</match>
@@ -88,17 +69,11 @@ Some PAM failure events on Ubuntu 25.04 include a `rhost=` field carrying the at
 </rule>
 ```
 
----
+### 3. Rule 100003: Rebuilt for the PAM Path
 
-### 3. Rule 100003 — Rebuilt for Ubuntu 25.04 PAM Log Path
-
-Rule 100003 was rewritten to use rule 2502 as the parent SID. Frequency threshold lowered to 3 attempts (from 5 in Lab 1b) — appropriate for the isolated lab environment where false positives from legitimate SSH traffic are not a concern:
+I rewrote rule 100003 to use rule 2502 as its parent, and dropped the threshold to three attempts in sixty seconds, which is fine in a lab where there's no legitimate SSH traffic to cause false positives:
 
 ```xml
-<!-- Rule 100003: SSH Brute Force — rebuilt for Ubuntu 25.04 PAM path -->
-<!-- CRITICAL: Ubuntu 25.04 sshd-session fires rule 2502 (PAM), NOT rules 5700 or 5710 -->
-<!-- Lab 1b used if_matched_sid=5700, valid for Ubuntu 22.04 / sshd process -->
-<!-- Requires PerSourcePenalties no in /etc/ssh/sshd_config for Hydra to reach auth layer -->
 <rule id="100003" level="10" frequency="3" timeframe="60">
   <if_matched_sid>2502</if_matched_sid>
   <same_source_ip />
@@ -110,63 +85,42 @@ Rule 100003 was rewritten to use rule 2502 as the parent SID. Frequency threshol
 </rule>
 ```
 
-```bash
-sudo systemctl restart wazuh-manager
-```
+### 4. Three More Windows Rules for Persistence and Lockout
 
----
-
-### 4. Windows Persistence and Account Monitoring Rules (100006, 100007, 100008)
-
-Three rules added to `local_rules.xml` extending Windows coverage toward persistence detection. These complement the lateral movement rules (100004, 100005) validated in Lab 1d:
+While I was in the rules file, I added three Windows rules that extend my coverage past brute force into persistence, complementing the lateral-movement rules from Lab 1d:
 
 ```xml
-<!-- Rule 100006: New Windows local account created (Event 4720) -->
-<!-- MITRE: T1136.001 — Create Account: Local Account -->
-<!-- Fires when an attacker or script creates a new user account for persistence -->
+<!-- Rule 100006: new local account created (Event 4720), T1136.001 -->
 <rule id="100006" level="12">
   <if_group>windows</if_group>
   <field name="win.system.eventID">^4720$</field>
   <description>Custom: Windows user account created (Event 4720) - possible persistence via local account</description>
-  <mitre>
-    <id>T1136.001</id>
-  </mitre>
+  <mitre><id>T1136.001</id></mitre>
 </rule>
 
-<!-- Rule 100007: New Windows service installed (Event 7045) -->
-<!-- MITRE: T1543.003 — Create or Modify System Process: Windows Service -->
-<!-- Fires on service installation; useful for catching service-based persistence or privilege escalation -->
+<!-- Rule 100007: new service installed (Event 7045), T1543.003 -->
 <rule id="100007" level="12">
   <if_group>windows</if_group>
   <field name="win.system.eventID">^7045$</field>
   <description>Custom: New Windows service installed (Event 7045) - possible persistence or privilege escalation</description>
-  <mitre>
-    <id>T1543.003</id>
-  </mitre>
+  <mitre><id>T1543.003</id></mitre>
 </rule>
 
-<!-- Rule 100008: Windows account lockout (Event 4740) -->
-<!-- MITRE: T1110 — Brute Force -->
-<!-- Complements rule 100002 (Event 4625, single failure); 4740 fires after lockout threshold is crossed -->
+<!-- Rule 100008: account lockout (Event 4740), T1110 -->
 <rule id="100008" level="10">
   <if_group>windows</if_group>
   <field name="win.system.eventID">^4740$</field>
   <description>Custom: Windows account lockout detected (Event 4740) - brute force indicator</description>
-  <mitre>
-    <id>T1110</id>
-  </mitre>
+  <mitre><id>T1110</id></mitre>
 </rule>
 ```
 
----
+### 5. Active Response: Blocking the Attacker Automatically
 
-### 5. Wazuh Active Response — Automated Firewall Block on Rule 100003
-
-Active Response configures Wazuh to execute a remediation script automatically when a specified rule fires. The `firewall-drop` command is built into Wazuh: it inserts an `iptables` DROP rule for the offending source IP and removes it after the configured timeout.
-
-**In `/var/ossec/etc/ossec.conf` on LAB-UBTU, inside the `<ossec_config>` block:**
+This was the new piece for me. Wazuh's Active Response runs a script when a rule fires, and the built-in `firewall-drop` adds an iptables DROP for the offending IP and pulls it back out after a timeout. I wired it to rule 100003:
 
 ```xml
+<!-- /var/ossec/etc/ossec.conf, inside <ossec_config> -->
 <active-response>
   <command>firewall-drop</command>
   <location>local</location>
@@ -179,40 +133,34 @@ Active Response configures Wazuh to execute a remediation script automatically w
 sudo systemctl restart wazuh-manager
 ```
 
-**What this does:** when rule 100003 fires, Wazuh executes `firewall-drop` on LAB-UBTU, adding a DROP rule to iptables for the attacker's source IP. The rule self-removes after 180 seconds, restoring connectivity. No manual intervention required.
-
----
+So when rule 100003 fires, Wazuh drops the attacker's IP for 180 seconds, then restores it, with no action from me.
 
 ## What I Detected
 
-From LAB-KALI, Hydra ran against LAB-UBTU's SSH service with rapid successive attempts. After three PAM auth failures from 192.168.10.30 within the 60-second window, rule 100003 fired in the Wazuh dashboard.
+From the Kali VM, I ran an SSH brute force against the Ubuntu box. After three PAM auth failures from 192.168.10.30 inside the sixty-second window, rule 100003 fired in the dashboard.
 
-![Rule 100003 firing — SSH brute force via PAM path, Wazuh dashboard](screenshots/p2-1b-brute-force-detection.png)
+![Rule 100003 firing, SSH brute force via the PAM path](screenshots/p2-1b-brute-force-detection.png)
 
-Immediately after rule 100003 fired, Active Response executed `firewall-drop`. Verified on LAB-UBTU:
+Right after it fired, Active Response added the firewall block. I confirmed it on the Ubuntu box:
 
 ```bash
 sudo iptables -L -n | grep 192.168.10.30
 # DROP  all  --  192.168.10.30  0.0.0.0/0
 ```
 
-![Active Response confirmed — iptables DROP for LAB-KALI (192.168.10.30)](screenshots/p2-1b-active-response-iptables.png)
+![Active Response confirmed, iptables DROP for the attacker](screenshots/p2-1b-active-response-iptables.png)
 
-After 180 seconds, Wazuh removed the DROP rule and connectivity from LAB-KALI was automatically restored.
+After 180 seconds the block cleared on its own.
 
----
+## What I Took Away
 
-## What I Learned
+**A detection can die silently when the platform changes under it.** On Ubuntu 22.04, sshd wrote failures in the format my rule expected. On 25.04, `sshd-session` hands them to PAM, which decodes as rule 2502 instead. There was no error and no warning, just zero alerts during an attack. `wazuh-logtest` is the tool for this: paste a real log line, watch where it lands, and build the rule around what actually fires rather than what fired on the last OS.
 
-**Ubuntu 25.04 sshd-session routes auth failures through PAM, not the standard sshd log path — and this breaks most off-the-shelf brute force detection rules silently.** On Ubuntu 22.04, the `sshd` process writes failures directly to auth.log in the format Wazuh's rules 5700 and 5710 expect. On Ubuntu 25.04, `sshd-session` delegates to PAM, and PAM failures decode as rule 2502. The detection gap is invisible: Wazuh runs, alerts work for other rules, and a brute force attack produces zero alerts. There's no error log, no missing rule warning. `wazuh-logtest` is the right diagnostic path — paste an actual auth.log line, watch the decoder chain, find the real rule ID. Don't assume the rule that worked on Ubuntu 22.04 still fires on 25.04.
+**PerSourcePenalties is a real defense that also hides the attack from the SIEM.** It drops repeated connections before authentication, so there's nothing to log. Turning it off makes sense for a detection lab, but it's worth understanding that it isn't a misconfiguration, it's a hardening feature. In production with it on, you'd lean on network-layer or firewall-log detection to catch early brute force, since the host won't log it.
 
-**PerSourcePenalties blocks Hydra before any auth event is written.** The setting is a legitimate defense: when a source IP fails connections repeatedly, sshd drops new connections at the transport layer before authentication starts. No auth attempt means no PAM event, no log, no Wazuh alert. Disabling it for lab testing is correct, and it's worth understanding that this isn't a configuration mistake on Ubuntu's part — it's a hardening feature that genuinely limits credential attacks. The side effect is that it also prevents SIEM-layer detection from seeing those attempts. In a production environment with this enabled, network-layer and flow-based detection (IDS, firewall logs) would need to carry the detection load for early-stage brute force.
+**Automated response is powerful and worth being careful with.** The firewall-drop fires within seconds, no SOAR and no analyst needed. In a lab, a false positive just blocks my attacker VM for three minutes. In production, auto-blocking at the SIEM can cut off legitimate traffic, and the risk scales with how precise the rule is. The usual production posture is to alert and enrich, then block downstream after someone confirms it. I wanted to build the capability and understand where the judgment call lives.
 
-**Active Response closes the detect-and-respond loop on-box without external tooling.** The firewall-drop script fires within seconds of rule 100003 triggering: no SOAR platform, no API call, no analyst action required. That makes it powerful and worth being careful about. In a lab this is fine — a false positive blocks Hydra for 3 minutes. In production, automated blocking at the SIEM layer risks cutting off legitimate traffic on a false positive, and the blast radius scales with the rule's precision. The production posture is usually to alert and enrich at the SIEM layer, with blocking downstream after analyst confirmation or in a SOAR playbook. The capability demonstrated here is real; the judgment about when to automate it is the practitioner skill.
-
-**Detection rules require active maintenance when platforms change.** Rule 100003 was written for a specific log format on a specific OS version. When the lab migrated from Ubuntu 22.04 (Hyper-V) to Ubuntu 25.04 (VirtualBox), the rule silently stopped working. No error. No warning. Just a detection gap that would have been invisible until an actual attack surfaced it. In production environments, detection rule validation via periodic attack simulation — purple team exercises, red team engagements, or scheduled synthetic attack runs — is a core detection engineering function. "The rule exists" and "the rule fires" are different claims.
-
----
+**Detection rules need maintenance, not just creation.** "The rule exists" and "the rule fires" are two different claims. The only reason I caught this gap is that I re-ran the attack after moving platforms. Periodically re-testing detections against a real attack is how you keep "exists" and "fires" from drifting apart.
 
 ## Lab Environment
 
@@ -224,14 +172,15 @@ After 180 seconds, Wazuh removed the DROP rule and connectivity from LAB-KALI wa
 | Network | Isolated host-only VirtualBox network (192.168.10.0/24), no external exposure |
 | Active Response | firewall-drop built-in script, 180s auto-expiring timeout |
 
+## What Came Next
+
+- **[CySA+ lab track](CySA/):** the CS0-004 labs that followed, picking up vulnerability management, memory forensics, cloud evidence acquisition, and a full incident response cycle on these same machines.
+- All eight custom rules from the P1 and P2 series, including the ones added here, are collected in [`detection-rules/local_rules.xml`](detection-rules/local_rules.xml).
+
+Still on my list:
+
+- Microsoft Sentinel: translate the Wazuh rules into KQL analytic rules once a Log Analytics Workspace is up, so the same detections run in a cloud SIEM.
+
 ---
 
-## Up Next
-
-- **Lab 2c:** Activate Microsoft Sentinel 31-day trial; connect Windows Security Events data connector; verify Phase 1 kill chain events are flowing into Log Analytics Workspace. Calendar reminder set for approximately July 25 (3-day buffer before day 31). See `00-LAB-P2-1c.md`.
-- **KQL detection rules:** Translate Wazuh custom rules 100002, 100004, and 100005 into KQL analytic rules in Sentinel — the same two-stage kill chain, now visible in the cloud-native SIEM.
-- **`detection-rules/local_rules.xml`:** Push rules 100006, 100007, 100008, and 100009 to the standalone deployable artifact in the repo with full MITRE annotation.
-
----
-
-*Part of the [cloud-security-lab-notes](https://github.com/JNewbrey87/cloud-security-lab-notes) portfolio, building toward Cloud Security Analyst and SC-200/CySA+/SC-500 certifications.*
+*Part of the [cloud-security-lab-notes](https://github.com/JNewbrey87/cloud-security-lab-notes) portfolio, building toward Cloud Security Analyst and the CySA+ / SC-200 / SC-500 certifications.*
