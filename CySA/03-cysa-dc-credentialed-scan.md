@@ -12,7 +12,7 @@
 
 ## Why I Did This One
 
-In my [first lab in this series](cysa-01-vuln-management-baseline.md), I ran an uncredentialed Nessus scan against my homelab, and my domain controller came back clean: 56 findings, all informational. I wasn't sure I trusted that, since an uncredentialed scan can only see what's exposed from the outside.
+In my [first lab in this series](01-cysa-vuln-management-baseline.md), I ran an uncredentialed Nessus scan against my homelab, and my domain controller came back clean: 56 findings, all informational. I wasn't sure I trusted that, since an uncredentialed scan can only see what's exposed from the outside.
 
 Vulnerability scanning and patching are already part of my infrastructure work, so a credentialed Nessus scan wasn't new to me. What I wanted from this lab was the part that tends to get skipped when you're working through a patch queue: slowing down on one finding to understand why it actually matters, proving the fix with a controlled re-scan instead of trusting a single pass, and checking the host's own logs to see what the scanner really did on the box.
 
@@ -125,8 +125,8 @@ Event ID 7040 logs changes to a service's start type, and 7036 logs a service st
 
 ## What Came Next
 
-- **[cysa-04](cysa-04-azure-vm-forensic-snapshot.md):** cloud forensic acquisition on an Azure VM, carrying the evidence work from my memory capture lab into the cloud.
-- **[cysa-05](cysa-05-ir-capstone.md):** the incident response capstone, which pulled this and the other labs into one incident.
+- **[cysa-04](04-cysa-azure-vm-forensic-snapshot.md):** cloud forensic acquisition on an Azure VM, carrying the evidence work from my memory capture lab into the cloud.
+- **[cysa-05](05-cysa-ir-capstone.md):** the incident response capstone, which pulled this and the other labs into one incident.
 
 Still on my list from this one:
 
