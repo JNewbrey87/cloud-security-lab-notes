@@ -69,5 +69,5 @@ Write-ups of earlier technical work that shaped my path into security.
 
 | Project | Maps To |
 |---------|---------|
-| [Phishing Triage Methodology: FAA Help Desk (~2020)](retrospective/Help-Desk-Phishing-Triage.md) | CySA+ Domains 1 and 3; T1566 |
+| [Phishing Triage Methodology: FAA Help Desk (2019)](retrospective/Help-Desk-Phishing-Triage.md) | CySA+ Domains 1 and 3; T1566 |
 | [Ark: Survival Evolved Dedicated Server Administration (2015-2017)](retrospective/pre-it-linux-server.md) | Linux server administration |
