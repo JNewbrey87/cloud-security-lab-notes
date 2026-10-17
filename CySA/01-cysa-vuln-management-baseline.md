@@ -5,7 +5,7 @@
 **Scanner:** Nessus Essentials, uncredentialed Basic Network Scan  
 **MITRE ATT&CK:** [T1557.001 — Adversary-in-the-Middle: LLMNR/NBT-NS Poisoning and SMB Relay](https://attack.mitre.org/techniques/T1557/001/)  
 **Cert Alignment:** CySA+ CS0-004, Domain 2 (Vulnerability Management), objectives 2.1 through 2.4  
-**Date:** October 2026  
+**Date:** October 2026
 
 ---
 
@@ -140,8 +140,8 @@ They all come from default Windows Server settings, since services like RDP and 
 
 ## What Came Next
 
-- **[cysa-03](cysa-03-dc-credentialed-scan.md):** the credentialed scan of the domain controller that this baseline pointed toward.
-- **[cysa-05](cysa-05-ir-capstone.md):** the incident response capstone that replayed the kill chain against these same machines.
+- **[cysa-03](03-cysa-dc-credentialed-scan.md):** the credentialed scan of the domain controller that this baseline pointed toward.
+- **[cysa-05](05-cysa-ir-capstone.md):** the incident response capstone that replayed the kill chain against these same machines.
 
 Still on my list from this one:
 
