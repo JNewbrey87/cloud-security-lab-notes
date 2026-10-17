@@ -1,53 +1,47 @@
-# Azure Arc Onboarding + MCSB Baseline Assessment
+# Lab 2a: Azure Arc Onboarding and an MCSB Baseline for the Lab
 
-**Project:** P2 — Azure Integration and Cloud Detection Engineering
-**Phase:** 2-1a | **Platform:** Azure Arc (hybrid), VirtualBox on Windows 11 Pro
-**MITRE ATT&CK:** [T1078 — Valid Accounts](https://attack.mitre.org/techniques/T1078/) / [T1562 — Impair Defenses](https://attack.mitre.org/techniques/T1562/) (via MCSB control coverage)
-**Cert Alignment:** CySA+ CS0-003, SC-200, SC-500
-**Date Completed:** June 2026
-
----
-
-## Scenario
-
-Phase 1 built a fully validated on-prem detection stack: four custom Wazuh rules, three active agents, and a two-stage brute-force-to-lateral-movement kill chain confirmed end-to-end. Every rule fired. Every event was traceable. Phase 1 is done.
-
-Phase 2 extends the same lab environment into Azure without migrating anything. Azure Arc brings on-prem and hosted machines under unified Azure management — the Arc agent runs on each VM and registers it as a `microsoft.hybridcompute/machines` resource. Once registered, those machines become targets for Azure Policy, Defender for Cloud assessments, Microsoft Sentinel data connectors, and the full suite of cloud-native security tooling.
-
-This lab covers the Phase 2 foundation: Arc onboarding for all three lab machines, resource governance tagging, Microsoft Cloud Security Benchmark (MCSB) baseline policy assignment, Microsoft Entra ID posture review, and the debugging insight that Defender for Cloud's Inventory UI is not the ground truth for Arc machines in a partial-trial subscription state.
+**Project:** P2, Azure Integration and Cloud Detection Engineering  
+**Phase:** 2-1a | **Platform:** Azure Arc (hybrid), VirtualBox on Windows 11 Pro  
+**MITRE ATT&CK:** [T1078 — Valid Accounts](https://attack.mitre.org/techniques/T1078/), [T1562 — Impair Defenses](https://attack.mitre.org/techniques/T1562/) (via MCSB control coverage)  
+**Cert Alignment:** CySA+ CS0-004, Domain 2 (Vulnerability Management); SC-200  
+**Date:** June 2026  
 
 ---
+
+## Why I Did This One
+
+Phase 1 left me with a working on-prem detection stack: four custom Wazuh rules, three agents, and a validated brute-force-to-lateral-movement kill chain. For Phase 2, I wanted to pull that same lab into Azure without moving any of it, so I could start learning the cloud-native security tooling against machines I already understood.
+
+Azure Arc is how you do that. The Arc agent runs on each on-prem machine and registers it in Azure as a managed resource, which makes it a target for Azure Policy, Defender for Cloud, and eventually Sentinel. Standing up cloud resources is familiar territory for me from work, but treating my own on-prem VMs as Azure-managed assets, and then reading their security posture through a benchmark, was the part I wanted the reps on. This lab covers the Arc onboarding, governance tagging, the Microsoft Cloud Security Benchmark (MCSB) baseline, an Entra ID posture check, and one debugging lesson about which Azure view you can actually trust.
+
+> **Update (October 2026):** the `rg-security-lab` resource group described here was later deleted during a separate cloud forensics lab (see [cysa-04](CySA/cysa-04-azure-vm-forensic-snapshot.md)), which removed the Arc registrations and the policy assignments below. Re-onboarding these machines to Arc, in a dedicated resource group this time, is on my list. Everything in this writeup reflects the state during the June 2026 session.
 
 ## Architecture
 
 ```
-[ZX-A3G15 — Windows 11 Pro]    [LAB-WSJP-25 — Tier 1 Jump Box]    [LAB-WSDC-22 — Tier 0 DC]
- 192.168.10.1 (host)             192.168.10.60, Win Server 2025       192.168.10.50, Win Server 2022
- Arc agent v1.65 (001)           Arc agent v1.65 (002)                Arc agent v1.65 (003)
-         |                                |                                    |
-         +--------------------------------+------------------------------------+
-                                          |
-                               [Azure Arc — rg-security-lab]
-                               Region: Central US
-                               Resource type: microsoft.hybridcompute/machines
-                                          |
-                    +---------------------+---------------------+
-                    |                                           |
-         [Azure Policy]                              [Microsoft Entra ID]
-         Guest Configuration prerequisite            Identity Secure Score: 68.42%
-         MCSB baseline (MCSB v2.*.*)                 5 security recommendations
-         0% compliance — expected baseline            Single GA user
+[ZX-A3G15: Win 11 Pro host]    [LAB-WSJP-25: Tier 1 Jump Box]    [LAB-WSDC-22: Tier 0 DC]
+ Arc agent 001                   Arc agent 002                     Arc agent 003
+         |                               |                                 |
+         +-------------------------------+---------------------------------+
+                                         |
+                             [Azure Arc: rg-security-lab, Central US]
+                             Resource type: microsoft.hybridcompute/machines
+                                         |
+                    +--------------------+--------------------+
+                    |                                         |
+         [Azure Policy]                            [Microsoft Entra ID]
+         Guest Configuration prerequisite          Identity Secure Score 68.42%
+         MCSB v2 baseline                          Single GA user
+         0% compliance (expected baseline)
 ```
 
-> All VMs remain on the isolated host-only VirtualBox network (192.168.10.0/24) for Wazuh lab work. Arc connectivity uses the NAT adapter on each VM for outbound Azure communication — Arc does not expose lab machines to the internet.
-
----
+The VMs stayed on the isolated host-only VirtualBox network for the Wazuh work. Arc talks to Azure over each VM's NAT adapter for outbound traffic only, so onboarding doesn't expose the lab machines to the internet.
 
 ## What I Built
 
-### 1. Azure Arc Onboarding — All Three Lab Machines
+### 1. Arc Onboarding for All Three Machines
 
-Arc agent version 1.65.03439.3010 was deployed to each machine using the onboarding script generated from Azure Arc → Servers → Add a single server. All three connected to resource group `rg-security-lab` in Central US.
+I deployed Arc agent v1.65 to each machine using the onboarding script Azure generates under Arc, Servers, Add a single server. All three joined resource group `rg-security-lab` in Central US.
 
 | Machine | Role | Arc Status |
 |---------|------|-----------|
@@ -55,146 +49,68 @@ Arc agent version 1.65.03439.3010 was deployed to each machine using the onboard
 | ZX-A3G15 | VirtualBox host, Windows 11 Pro | Connected |
 | LAB-WSDC-22 | Tier 0 DC, Windows Server 2022 | Connected |
 
-**On each machine (elevated PowerShell):**
-
 ```powershell
 Set-ExecutionPolicy Bypass -Scope Process -Force
 .\ArcOnboardingScript.ps1
-# A device-code login prompt appears — authenticate as the Azure account owner
+# a device-code login prompt appears; authenticate as the Azure account owner
 ```
 
-After sign-in, the Arc service (`himds` — Hybrid Instance Metadata Service) starts and registers the machine. Verify on the machine:
+After sign-in, the Arc service (`himds`, the Hybrid Instance Metadata Service) starts and registers the machine. I confirmed each one showed Connected in the portal.
 
-```powershell
-Get-Service himds | Select-Object Name, Status
-# Expected: Running
-```
+I onboarded the VirtualBox host itself (ZX-A3G15) on purpose, since it also runs as Wazuh agent 001 and is part of the detection pipeline. Having it in Azure alongside the VMs gives a complete picture of the fleet. It's still permanently off-limits as a lab attack target.
 
-Verify in the portal: Azure Arc → Servers → all three machines show **Connected**.
+### 2. Governance Tagging
 
-**Key decision:** ZX-A3G15 (the VirtualBox host itself) was also onboarded. This is intentional — it's running as Wazuh agent 001 and is already part of the detection pipeline. Having it visible in Azure alongside the lab VMs gives a complete picture of the Arc-connected fleet. It is still permanently excluded as a lab attack target.
+I tagged `rg-security-lab` with `Environment: Lab`, `Owner: JNewbrey`, and `Project: cloud-security-homelab`. Tags set at the resource group level are inherited by everything in the group, so all three machines carry them for filtering, reporting, and cost tracking. It's a small step, but tagging from the start rather than retrofitting it later is the kind of governance hygiene that holds up in an audit.
 
----
+### 3. MCSB Baseline Policy
 
-### 2. Resource Group Tagging
+I made two policy assignments at the `rg-security-lab` scope:
 
-Standard governance tags applied to `rg-security-lab`:
+- **Guest Configuration prerequisite.** Deploys the managed identity and Windows Guest Configuration extension to each Arc machine, which any policy that reads machine configuration needs.
+- **"Windows machines should meet requirements of the Azure compute security baseline."** This is MCSB v2, Azure's equivalent of the CIS Benchmarks. It checks each machine against 223 policies across control families like logging, incident response, privileged access, data protection, and endpoint security.
 
-| Tag | Value |
-|-----|-------|
-| `Environment` | `Lab` |
-| `Owner` | `JNewbrey` |
-| `Project` | `cloud-security-homelab` |
+### 4. Entra ID Posture Check
 
-Tags applied at the resource group level are inherited by all resources in the group, meaning all three Arc-connected machines and future resources in `rg-security-lab` carry these tags for filtering, reporting, and cost attribution.
-
-**In the portal:** Resource Groups → rg-security-lab → Tags → add all three → Save.
-
-This is a small step with disproportionate value during an audit or a job interview: it shows that governance hygiene was applied from the start, not retrofitted after the fact.
-
----
-
-### 3. Azure Policy Assignments — MCSB Baseline
-
-Two policy assignments were made at the `rg-security-lab` scope:
-
-**Assignment 1 — Guest Configuration prerequisite initiative**
-
-Deploys the managed identity and Windows Guest Configuration extension to each Arc machine. This is a prerequisite for any policy that reads machine configuration state (compliance settings, audit policies, etc.). Role assignments were created successfully during deployment.
-
-**Assignment 2 — Windows machines should meet requirements of the Azure compute security baseline**
-
-The Microsoft Cloud Security Benchmark (MCSB), version 2, applied to Azure subscription 1. This is the Azure-native equivalent of CIS Benchmarks — it evaluates machine configuration against 223 security policies across control families including logging, incident response, privileged access, data protection, and endpoint security.
-
-**In the portal:** Azure Policy → Assignments → Assign policy → select scope → find "Windows machines should meet requirements of the Azure compute security baseline."
-
----
-
-### 4. Microsoft Entra ID Posture Review
-
-Reviewed the Entra ID tenant's security posture after Arc onboarding. Baseline state:
-
-- **Identity Secure Score:** 68.42%
-- **Security recommendations:** 5 active (all free tier)
-- **Notable finding:** "Do not expire passwords" flagged as High severity, 8/8 users impacted — intentionally left as-is for a solo lab environment; enforcing password expiration on a single-user tenant would add friction with no real security benefit
-- **License:** Microsoft Entra ID Free
-- **Users:** Single Global Administrator (Joshua Newbrey)
-
----
+I reviewed the tenant's posture after onboarding. Identity Secure Score was 68.42%, with five free-tier recommendations. The one flagged High was "Do not expire passwords," affecting all users. I left it as-is on purpose, since forcing password expiration on a single-user lab tenant adds friction for no real security benefit. The tenant is Entra ID Free with a single Global Administrator.
 
 ## What I Observed
 
-### MCSB Baseline Assessment Results
+After the policies propagated, the Policy Compliance dashboard showed 0% compliance across all four assessed resources, with 27 non-compliant policies out of 223.
 
-After policy propagation, the Policy Compliance dashboard showed the expected baseline state: 0% compliance across all four assessed resources.
+![MCSB Policy Compliance groups](screenshots/p2-1a-policy-compliance-mcsb-baseline.png)
 
-![MCSB Policy Compliance Groups](screenshots/p2-1a-policy-compliance-mcsb-baseline.png)
+The biggest non-compliant control families:
 
-**Overall:** 0 out of 4 resources compliant. 27 non-compliant policies out of 223 total.
-
-**Non-compliant control families (by policy count):**
-
-| Control ID | Name | Category | Non-compliant / Total |
-|-----------|------|----------|----------------------|
+| Control | Name | Category | Non-compliant / Total |
+|---------|------|----------|----------------------|
 | IT-1 | Enable threat detection capabilities | Logging and Threat Detection | 12 / 20 |
 | IR-1 | Detection and analysis: create incidents | Incident Response | 11 / 17 |
 | IR-5 | Detection and analysis: prioritize incidents | Incident Response | 11 / 17 |
-| IT-2 | Enable threat detection for identity and access management | Logging and Threat Detection | 11 / 19 |
+| IT-2 | Threat detection for identity and access | Logging and Threat Detection | 11 / 19 |
 | DP-2 | Monitor anomalies targeting sensitive data | Data Protection | 5 / 6 |
 | PA-4 | Review and reconcile user access regularly | Privileged Access | 5 / 5 |
 | PA-1 | Separate and limit highly privileged users | Privileged Access | 4 / 4 |
-| IR-2 | Preparation: setup incident notification | Incident Response | 3 / 3 |
-| PV-6 | Rapidly and automatically remediate vulnerabilities | Posture and Vulnerability Management | 3 / 6 |
-| ES-1 | Use Endpoint Detection and Response (EDR) | Endpoint Security | 1 / 1 |
 
-**0% is the correct expected baseline.** These machines have no hardening applied, no logging configured beyond Wazuh, no Defender for Endpoint, no Sentinel workspace. Every non-compliant policy is a documented gap to close over the next lab phases — not an error.
+0% is the right baseline here, not a failure. These machines have no hardening, no logging beyond Wazuh, no Defender for Endpoint, and no Sentinel workspace yet. Every non-compliant policy is a gap to close in later phases.
 
----
+The four non-compliant resources were the subscription itself plus the three machines, each listed as `microsoft.hybridcompute/machines` in Central US. That resource type is the confirmation that Arc onboarding worked, since it marks them as on-prem machines managed through Arc rather than native Azure VMs.
 
-### Non-Compliant Resources Confirmed
+![Non-compliant Arc machines](screenshots/p2-1a-policy-noncompliant-resources.png)
 
-![Non-compliant resources — Arc machines](screenshots/p2-1a-policy-noncompliant-resources.png)
+### The Defender for Cloud View That Lied to Me
 
-Four non-compliant resources listed:
+Defender for Cloud's Inventory showed 0 assessed resources, which looked like the whole thing had failed. It hadn't. The subscription was in a "Trial expired, Partial" state, which breaks the Inventory UI, but the MCSB assessment was running fine, which I confirmed on the Policy Compliance dashboard. The Inventory view was the broken surface, not the scan.
 
-1. `microsoft.resources/subscriptions` — the Azure subscription itself
-2. `lab-wsdc-22` — `microsoft.hybridcompute/machines`, Central US, rg-security-lab
-3. `zx-a3g15` — `microsoft.hybridcompute/machines`, Central US, rg-security-lab
-4. `lab-wsjp-25` — `microsoft.hybridcompute/machines`, Central US, rg-security-lab
+## What I Took Away
 
-The `microsoft.hybridcompute/machines` resource type is the confirmation that Arc onboarding succeeded. These are not native Azure VMs — they are on-prem machines managed through Arc, which is exactly what was intended.
+**Check the policy layer, not the Inventory count.** A silent Inventory failure in a partial-trial subscription looks exactly like a failed onboarding or a broken policy. The Policy Compliance view, filtered to the Arc machine resource type, is what told me the scan was actually working. In production, a silent UI failure like that is how you end up with a false sense of security, so verifying at the policy layer is the right instinct.
 
----
+**The MCSB breakdown shows where the gaps cluster.** IT-1 and IT-2 together are 23 logging and detection policies, almost all non-compliant, and IR-1 and IR-5 add another 34 for incident response. That's by design: MCSB assumes most organizations have a detection-and-response gap more than a firewall gap, so it weighs logging and IR heavily. That told me where to aim Phase 2, which is Sentinel and KQL detection first.
 
-### Resource Group Tags Confirmed
+**Tag at setup, not after.** Tagging the resource group before adding machines means everything inherits the tags automatically. Doing it after the fact means chasing down each resource one at a time. The tags are boring; the timing is the point.
 
-![rg-security-lab tags](screenshots/p2-1a-rg-security-lab-tags.png)
-
-All three tags saved successfully with no pending changes.
-
----
-
-### Defender for Cloud Inventory — UI Limitation
-
-Defender for Cloud Inventory showed 0 assessed resources at the time of review. This looked like a scan failure but is not.
-
-**Root cause:** The subscription is in a "Trial expired - Partial" state, which causes the Inventory UI to display incorrectly. The underlying MCSB assessment is running — the Policy Compliance dashboard confirmed all three Arc machines are being evaluated. The Inventory view is the broken surface, not the scan engine.
-
-**Practical takeaway:** When troubleshooting Defender for Cloud in a free/partial subscription state, use Azure Policy → Compliance as the ground truth for Arc machine assessment status. Inventory is unreliable in this state.
-
----
-
-## What I Learned
-
-**Azure Policy Compliance is the ground truth for Arc machines, not Defender for Cloud Inventory.** The Inventory UI failing silently in a partial-trial subscription state looks exactly like a failed Arc onboarding or a misconfigured policy assignment. The Policy Compliance view — filtering by `microsoft.hybridcompute/machines` resource type — is what confirmed the scan was running. This distinction matters: in a production environment, a silent UI failure like this is the kind of thing that creates a false sense of security. The correct response is to verify at the policy layer, not accept the Inventory count as definitive.
-
-**The MCSB control family breakdown reveals where cloud-native detection gaps are most concentrated.** IT-1 and IT-2 together represent 23 logging and threat detection policies, almost all non-compliant. IR-1 and IR-5 represent another 34 incident response policies. This is not a coincidence: MCSB is built around the assumption that most enterprises have a detection and response gap, not a firewall or access-control gap. The framework weights logging, monitoring, and incident response the heaviest. Phase 2 lab work (Sentinel, KQL detection rules, data connectors) will close the IT-1 and IR-1 families first — those are the most policy-dense and the most directly relevant to detection engineering.
-
-**Resource tagging at the resource group level should happen at setup, not retrospectively.** Applying `Environment`, `Owner`, and `Project` tags before adding resources means every resource in the group inherits them automatically. Doing this after the fact — with dozens of resources already deployed — means hunting down each resource individually. The tags themselves are unremarkable; the timing is the discipline.
-
-**Arc registers on-prem machines under Azure management without migrating or exposing them.** The `microsoft.hybridcompute/machines` resource type is the key: these are not VMs running in Azure datacenters. They are lab VMs running on a local VirtualBox host, registered with Azure management plane through the Arc agent's outbound HTTPS connection. Azure Policy can evaluate them, Defender for Cloud can assess them, and Sentinel can eventually ingest their logs — all without any inbound connectivity to the lab network.
-
----
+**Arc manages on-prem machines without moving or exposing them.** These are VMs on a local VirtualBox host, registered to the Azure control plane through the agent's outbound HTTPS. Azure can evaluate, assess, and eventually ingest logs from them with no inbound connection to the lab. That's the whole value of Arc, and seeing it work on my own machines made it click.
 
 ## Lab Environment
 
@@ -203,19 +119,21 @@ Defender for Cloud Inventory showed 0 assessed resources at the time of review. 
 | VirtualBox Host | ZX-A3G15, Windows 11 Pro, VirtualBox 7 |
 | Lab Network | Isolated host-only (192.168.10.0/24, no external exposure) |
 | Arc machines | LAB-WSDC-22 (Server 2022), LAB-WSJP-25 (Server 2025), ZX-A3G15 (Windows 11 Pro) |
-| Azure resource group | rg-security-lab, Central US |
+| Azure resource group | rg-security-lab, Central US (later deleted; see note at top) |
 | Arc agent version | v1.65.03439.3010 |
-| Azure Policy scope | Azure subscription 1 (MCSB baseline + Guest Config) |
 | Entra ID | Free tier, single GA user, Identity Secure Score 68.42% |
 
+## What Came Next
+
+- **[P2-1b](00-LAB-P2-1b.md):** rebuilding SSH brute force detection for Ubuntu 25.04 and adding Wazuh Active Response.
+- **[CySA+ lab track](CySA/):** the CS0-004 labs that followed, including the cloud forensic snapshot that reused this Azure tenant.
+
+Still on my list from this one:
+
+- Re-onboard the machines to Arc in a dedicated resource group, after the cysa-04 teardown.
+- Microsoft Sentinel: a Log Analytics Workspace and the Windows Security Events connector, to get the Phase 1 kill chain into a cloud SIEM.
+- Translate the Wazuh rules (100002, 100004, 100005) into KQL analytic rules in Sentinel.
+
 ---
 
-## Up Next
-
-- **Microsoft Sentinel:** Activate the 31-day free trial on a new Log Analytics Workspace; connect the Windows Security Events data connector; verify Phase 1 kill chain events are flowing. Calendar reminder set for approximately July 25 (3-day buffer before day 31). See `00-LAB-P2-1b.md`.
-- **KQL detection rules:** Translate Wazuh custom rules 100002, 100004, and 100005 into KQL analytic rules in Sentinel — the same kill chain, now visible in the cloud-native SIEM.
-- **Rule 100003 (SSH brute force) re-validation:** `PerSourcePenalties no` fix pending on LAB-UBTU before next Hydra run.
-
----
-
-*Part of the [cloud-security-lab-notes](https://github.com/JNewbrey87/cloud-security-lab-notes) portfolio, building toward Cloud Security Analyst and SC-200/CySA+/SC-500 certifications.*
+*Part of the [cloud-security-lab-notes](https://github.com/JNewbrey87/cloud-security-lab-notes) portfolio, building toward Cloud Security Analyst and the CySA+ / SC-200 / SC-500 certifications.*
