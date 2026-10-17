@@ -1,10 +1,10 @@
 # Phishing Triage Methodology: FAA Help Desk
 
 **Type:** Retrospective  
-**Role:** Help Desk technician, Federal Aviation Administration (contract)  
+**Role:** Help Desk technician, Federal Aviation Administration  
 **MITRE ATT&CK:** [T1566 — Phishing](https://attack.mitre.org/techniques/T1566/)  
 **Cert Alignment:** CySA+ CS0-004, Domain 1 (Security Operations) and Domain 3 (Incident Response and Management)  
-**Date:** ~2020  
+**Date:** 2019  
 
 ---
 
