@@ -3,7 +3,7 @@
 **Project:** AEGIS (Adaptive Execution and Generative Intelligence System)  
 **Type:** Evidentiary layer for the Red Team / Blue Team simulation  
 **Platform:** ASUS ROG Flow Z13 (ZX-A3G15), local inference through Ollama  
-**Date:** September 2026  
+**Date:** September 2026
 
 ---
 
@@ -81,7 +81,7 @@ One hedge on this run: the same model did real detection engineering six days ea
 
 ## A Note About These Records
 
-Records from before September 11, 2026 were produced on the CPU; later ones ran on the GPU. That's the one distinction the chain doesn't capture on its own, so I want to be precise about it. This was a regression, not a machine that never worked: the same 70B model ran on the GPU in June and July, then at some point the installed inference backend changed, the machine fell back to the CPU without any warning, and the GPU path wasn't restored until September 11 ([aegis-03](aegis-03-gpu-cpu-fallback.md) covers how I found it).
+Records from before September 11, 2026 were produced on the CPU; later ones ran on the GPU. That's the one distinction the chain doesn't capture on its own, so I want to be precise about it. This was a regression, not a machine that never worked: the same 70B model ran on the GPU in June and July, then at some point the installed inference backend changed, the machine fell back to the CPU without any warning, and the GPU path wasn't restored until September 11 ([aegis-03](03-AEGIS-GPU-Investigation.md) covers how I found it).
 
 The two ledger runs from that CPU window are still valid evidence. They were produced correctly, just on a slower path. I chose to note the CPU-versus-GPU split in this paragraph instead of adding code or a second file, which means the chain isn't self-describing on this point. That's a mild tension with my own framework's principle that evidence should stand on its own, and I'd rather name it than hide it.
 
@@ -119,7 +119,7 @@ The two ledger runs from that CPU window are still valid evidence. They were pro
 
 ## What Came Next
 
-- **[aegis-03](aegis-03-gpu-cpu-fallback.md):** the companion to this one. While setting up these runs, I found the 70b model had been running on the CPU, and tracked down why.
+- **[aegis-03](03-AEGIS-GPU-Investigation.md):** the companion to this one. While setting up these runs, I found the 70b model had been running on the CPU, and tracked down why.
 
 Still on my list:
 
@@ -127,7 +127,7 @@ Still on my list:
 - Exercising the untested `crew_failure` path, so a crashed crew still writes an evidence record.
 - The LangGraph migration, where the bridge's framework-agnostic design is supposed to carry over untouched.
 
-Back to the start: [aegis-00](aegis-00-poc-70b.md).
+Back to the start: [aegis-00](00-AEGIS-PoC-70b.md).
 
 ---
 
