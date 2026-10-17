@@ -1,33 +1,31 @@
-# GRC Toolkit Lab - SOC2 & GLBA Gap Assessment
+# GRC Toolkit Lab: SOC 2 and GLBA Gap Assessment of My Own Repos
 
-**Date:** May 19, 2026  
-**Environment:** WSL2 (Ubuntu) on Windows 11 
+**Project:** GRC  
+**Platform:** WSL2 (Ubuntu) on Windows 11  
 **Tool:** [claude-grc-engineering](https://github.com/GRCEngClub/claude-grc-engineering) by GRC Engineering Club  
 **Frameworks Assessed:** SOC 2 (AICPA Trust Services Criteria), GLBA Safeguards Rule (16 C.F.R. Part 314)  
-**Status:** Phase 1 complete - findings documented; remediation in progress
+**Cert Alignment:** CySA+ CS0-004, Domain 4 (Reporting and Communication)  
+**Status:** Assessment complete; findings documented; remediation still open  
+**Date:** May 19, 2026  
 
 ---
 
-## Objective
+## Why I Did This One
 
-This lab is foundational work in a broader series. I ran the github-inspector assessment here first to get comfortable with the toolkit's architecture, invocation method, and output format before applying it to more complex environments; specifically, the Hyper-V lab sessions on the home build and the Azure tenant I'm standing up for SC-500 and SC-200 prep. Getting the toolchain functional and documented at a simpler scope first means less friction in later labs where the configuration surface is significantly larger.
+I saw this toolkit advertised on LinkedIn and thought it might be a nifty tool to bring into the lab environment one day. Before doing that, I wanted to learn how it's put together, how to invoke it, and what the output looks like, at a scope small enough that a big configuration surface wouldn't get in the way.
 
-Beyond the setup value, I wanted a real findings artifact tied to frameworks I work with daily. I work in a GLBA and PCI-DSS regulated banking environment, so running a gap assessment against those frameworks against my own GitHub repos isn't a synthetic exercise; it's applying a compliance lens to actual public-facing work. The goal was to establish hands-on familiarity with automated GRC tooling, produce a genuine findings artifact, and identify remediation actions I can actually close.
+My own GitHub repos made a good first target. They're real, they're public, they're tied to my professional portfolio, and any gap the tool finds is one I can actually close. So the findings here aren't synthetic.
 
----
+## Environment and Prerequisites
 
-## Environment & Prerequisites
-
-The toolkit requires a Unix environment; Windows native PowerShell isn't supported. WSL2 was already configured on my machine (Ubuntu distro on LAB-PC, confirmed via `wsl --status`), so all commands below run inside that environment.
-
-**Dependencies installed inside WSL2:**
+The toolkit needs a Unix environment; native Windows PowerShell isn't supported. WSL2 was already set up on my machine at the time (Ubuntu distro, confirmed with `wsl --status`), so everything below runs inside it.
 
 ```bash
 # GitHub CLI
 sudo apt install gh
-gh auth login   # authenticated as JNewbrey87 via browser flow
+gh auth login   # authenticated as JNewbrey87 through the browser flow
 
-# Claude Code (routed to user-owned directory to avoid permission issues)
+# Claude Code, installed to a user-owned directory to avoid permission issues
 mkdir -p ~/.npm-global
 npm config set prefix '~/.npm-global'
 echo 'export PATH=~/.npm-global/bin:$PATH' >> ~/.bashrc
@@ -35,13 +33,13 @@ source ~/.bashrc
 npm install -g @anthropic-ai/claude-code
 ```
 
-Both `claude --version` and `gh auth status` returned clean output before proceeding.
+Both `claude --version` and `gh auth status` came back clean before I moved on.
 
----
+## What I Built
 
-## Setup
+### 1. Loading the Toolkit
 
-The toolkit uses a plugin architecture, but the `/plugin` slash command documented in the quickstart isn't wired up in the current Claude Code release. I used the local clone method instead:
+The toolkit uses a plugin architecture, but the `/plugin` slash command from the quickstart wasn't wired up in the Claude Code release I had. I used the local clone method instead:
 
 ```bash
 cd ~
@@ -50,126 +48,116 @@ cd claude-grc-engineering
 claude --plugin-dir .
 ```
 
-Launching Claude Code with `--plugin-dir .` loads the repo's `CLAUDE.md` as context, giving Claude Code full knowledge of the toolkit's capabilities, runbooks, and the Secure Controls Framework (SCF) crosswalk. Slash commands don't auto-register this way, but plain-language prompts produce the same output since the underlying behavior is prompt-driven. The slash commands are just documented shortcuts.
+Launching with `--plugin-dir .` loads the repo's `CLAUDE.md` as context, which gives Claude Code the toolkit's capabilities, runbooks, and the Secure Controls Framework (SCF) crosswalk. The slash commands don't auto-register this way, but since the underlying behavior is prompt-driven, a plain-language prompt gets the same result. The slash commands are just shortcuts.
 
----
+### 2. Scoping the Scan
 
-## What I Scanned
-
-**Scope:** My personal GitHub account (`@me` - JNewbrey87)
-
-**Repositories evaluated:**
+I scoped it to my personal GitHub account (`@me`, JNewbrey87) and its three repos:
 
 | Repository | Purpose |
 |---|---|
-| `cloud-security-lab-notes` | Active lab documentation and portfolio artifacts |
+| `cloud-security-lab-notes` | Lab documentation and portfolio artifacts |
 | `JNewbrey87` (profile repo) | GitHub profile README |
 | `CFRPF` | Cloud Forensic Readiness and Preservation Framework (graduate thesis) |
 
-The github-inspector connector evaluated branch protection configuration, GitHub Actions setup, Dependabot status, secret scanning state, code scanning enablement, and deploy key configuration across all three repos.
+The github-inspector connector checks branch protection, GitHub Actions setup, Dependabot status, secret scanning, code scanning, and deploy keys across each repo.
 
----
+### 3. Running the Assessment
 
-## How I Ran the Assessment
-
-Since slash commands weren't registering, I invoked the assessment via a plain-language prompt inside the Claude Code session:
+With the slash commands unavailable, I ran it with a plain-language prompt inside the Claude Code session:
 
 > *"Set up the github-inspector connector for my GitHub account (JNewbrey87) and collect findings from all my personal repos, then run a gap assessment against SOC2 and GLBA frameworks."*
 
-Claude Code cross-referenced the loaded `CLAUDE.md`, ran the collection and crosswalk steps agenically, and wrote the full report bundle to disk.
+Claude Code used the loaded `CLAUDE.md` to run the collection and crosswalk steps agentically and wrote the full report bundle to disk at `./gap-assessment-20260519231045-a7c11d5b/`.
 
-**Report artifact:** `./gap-assessment-20260519231045-a7c11d5b/`
+## What I Found
 
----
-
-## Coverage Summary
+### Coverage
 
 | Framework | Controls Evaluated / Total | Pass Rate |
 |---|---|---|
 | SOC 2 | 26 / 399 (7%) | 0% |
 | GLBA | 1 / 52 (2%) | 0% |
 
-**Why the coverage percentages are low:** The github-inspector connector maps to 4 SCF controls. The full SOC 2 and GLBA control libraries are far broader than what any single connector can evaluate; this one is scoped specifically to repository-level security posture. The low percentages are expected and documented in the toolkit. The 0% pass rate is the number that actually matters; it means every control that was evaluated returned a finding.
+The low coverage is expected. The github-inspector connector maps to only 4 SCF controls, and it's scoped to repository-level security posture, so it can't touch most of what SOC 2 or GLBA cover. The number that matters is the 0% pass rate: every control the tool could evaluate came back as a finding.
 
----
+### Tier 1: Certification Blocker
 
-## Findings
+**CHG-02, Configuration Change Control (HIGH)**
 
-### Tier 1 - Certification Blocker (1)
+None of the three repos have branch protection on `main`, so direct pushes without review are allowed.
 
-**CHG-02 | Configuration Change Control** - HIGH severity
+- **SOC 2:** CC8.1, CC8.1-POF1-14, CC2.2, CC3.4
+- **GLBA:** §314.4(c)(7), the Safeguards Rule monitoring and testing requirement
+- **Remediation:** enable branch protection on each repo with at least one required review and status checks. Roughly 15 minutes per repo through the GitHub UI, or automated with Terraform. This one fix clears the blocker across 17 SOC 2 sub-controls.
 
-All three repositories have no branch protection rules on `main`; direct pushes without review are permitted.
+### Tier 2: Active Findings
 
-- **SOC 2 mapping:** CC8.1, CC8.1-POF1-14, CC2.2, CC3.4
-- **GLBA mapping:** §314.4(c)(7) - Safeguards Rule, monitoring and testing requirement
-- **Remediation:** Enable branch protection on each repo with at least one required review and status checks. Estimated 15 minutes per repo; can be done via GitHub UI or automated via Terraform. This single fix clears the blocker across 17 SOC 2 sub-controls.
+**MON-01.4, Dependabot Alerts**
 
----
+Automated dependency vulnerability alerts aren't enabled on any of the three repos.
 
-### Tier 2 - Active Findings (2)
+- **SOC 2:** CC7.1
+- **GLBA:** dependency monitoring gap under the Safeguards Rule
+- **Remediation:** enable Dependabot alerts in each repo's Security settings, about 5 minutes per repo.
 
-**MON-01.4 | Dependabot Alerts**
+**IAO-04, Code Scanning (SAST)**
 
-Automated dependency vulnerability alerts are not enabled on any of the three repositories.
+No static analysis is configured on any of the three repos.
 
-- **SOC 2 mapping:** CC7.1
-- **GLBA mapping:** Dependency monitoring gap under the Safeguards Rule
-- **Remediation:** Enable Dependabot alerts under each repo's Security settings. Approximately 5 minutes per repo.
+- **SOC 2:** CC8.1
+- **GLBA:** §314.4(c)
+- **Remediation:** enable CodeQL through a GitHub Actions workflow, either with GitHub's built-in "Set up code scanning" button on each repo or one shared template applied across all three.
 
-**IAO-04 | Code Scanning / SAST**
+### Inconclusive
 
-Static application security testing is not configured on any of the three repositories.
+**MON-01, Secret Scanning**
 
-- **SOC 2 mapping:** CC8.1
-- **GLBA mapping:** §314.4(c)
-- **Remediation:** Enable CodeQL via a GitHub Actions workflow. The easiest path is GitHub's built-in "Set up code scanning" button per repo, or a shared template PR applied across all three.
+The connector couldn't confirm secret scanning status. It likely needs GitHub Advanced Security or a wider OAuth scope to read that setting. The fix is to re-run the collect step after adding the `security_events` scope:
 
----
+```bash
+gh auth refresh --scopes=repo,read:org,security_events
+```
 
-### Inconclusive (1)
+### Remediation Order
 
-**MON-01 | Secret Scanning**
+1. **Branch protection on all three repos**, about 30 minutes total. Clears the Tier 1 blocker and the biggest control cluster in the report.
+2. **Dependabot alerts**, about 5 minutes per repo.
+3. **CodeQL** through GitHub Actions, using a shared workflow template.
+4. **Re-run collection with the `security_events` scope** to resolve MON-01.
 
-Secret scanning status could not be confirmed; the connector likely needs GitHub Advanced Security or an expanded OAuth scope to read this setting.
+After steps 1 through 3, a second assessment run gives a before-and-after comparison of the pass rate.
 
-- **Resolution:** Re-run the collect step with the `security_events` scope added: `gh auth refresh --scopes=repo,read:org,security_events`
+## What I Took Away
 
----
+**Low coverage and a 0% pass rate are two different signals.** Seven percent coverage says the connector is narrow; that's a property of the tool. Zero percent passing says every control it could check failed; that's a property of my repos. Reading the report correctly depends on keeping those apart.
 
-## Priority Remediation Order
+**The highest-impact fix is also the cheapest.** Branch protection is a settings change, and it accounts for the only Tier 1 finding and 17 SOC 2 sub-controls. Sorting remediation by impact against effort, instead of by the order findings show up in the report, is what made the priority list obvious.
 
-1. **Enable branch protection on all three repos** - 30 minutes total. Clears the Tier 1 blocker and satisfies the most impactful control cluster in the report.
-2. **Enable Dependabot alerts** - 5 minutes per repo via Security settings.
-3. **Enable CodeQL** via GitHub Actions - shared workflow template is the most efficient approach.
-4. **Re-run collect with `security_events` scope** - resolves the MON-01 inconclusive result and gives a complete picture of secret scanning posture.
+**Framework mappings make a small gap legible to an auditor.** "No branch protection" is a technical detail. "CHG-02, mapped to SOC 2 CC8.1 and GLBA §314.4(c)(7)" is something a compliance reviewer can act on. That translation from setting to control is most of the value the toolkit adds.
 
-After completing steps 1 through 3, re-run the gap assessment to capture the before/after delta. That remediation cycle artifact will show a measurable improvement in pass rate across the evaluated controls.
+**Why both frameworks.** I work in a GLBA and PCI-DSS regulated banking environment, so mapping findings to the Safeguards Rule connects lab work to rules I already live under. SOC 2 isn't part of my day-to-day, but its Common Criteria are the standard assurance reference for cloud and SaaS providers, and I need to be fluent in it for the cloud security roles I'm working toward. Seeing my own gaps written in SOC 2 terms is a practical way to start.
 
----
+## Lab Environment
 
-## Framework Context
+| Component | Details |
+|-----------|---------|
+| Host | Windows 11, WSL2 with Ubuntu |
+| Tooling | GitHub CLI, Claude Code, claude-grc-engineering (local clone, `--plugin-dir`) |
+| Control framework | Secure Controls Framework (SCF) crosswalk, 1,468 controls and 249 framework mappings |
+| Scope | Three public repos under JNewbrey87 |
+| Report bundle | `./gap-assessment-20260519231045-a7c11d5b/` |
 
-**Why GLBA?** I work in a GLBA-regulated banking environment. Running a gap assessment against the Gramm-Leach-Bliley Act Safeguards Rule against my own GitHub repos isn't a stretch; it connects lab work directly to the regulatory environment I operate in daily. The CHG-02 finding under §314.4(c)(7) isn't theoretical; it's a real control gap in repositories that are publicly visible and tied to my professional portfolio.
+## What Came Next
 
-**Why SOC 2?** SOC 2 Trust Services Criteria (specifically the Common Criteria / CC series) is the dominant attestation framework for cloud-hosted services and SaaS environments. Understanding how control gaps surface in SOC 2 terms is directly relevant to Cloud Security Analyst roles, where SOC 2 reports come up constantly as a baseline assurance reference.
-
----
-
-## What This Lab Demonstrates
-
-- Hands-on use of open-source GRC tooling built on the Secure Controls Framework (1,468 controls, 249 framework mappings)
-- Ability to run a structured gap assessment and interpret findings in both framework-native and plain-language terms
-- Working knowledge of specific GLBA Safeguards Rule subsections and their mapping to technical controls
-- Understanding the difference between low coverage (expected, tool-scoped) and 0% pass rate (genuine; every evaluated control failed)
-- A documented remediation backlog with effort estimates, organized by priority tier
-
----
-
-## Next Steps
+The remediation from this assessment is still open. Still on my list:
 
 - [ ] Enable branch protection on `cloud-security-lab-notes`, `JNewbrey87`, and `CFRPF`
 - [ ] Enable Dependabot alerts on all three repos
-- [ ] Configure CodeQL via GitHub Actions
-- [ ] Refresh gh auth scope and resolve MON-01 secret scanning status
-- [ ] Re-run collection and gap assessment; commit before/after delta as Phase 2 of this lab
+- [ ] Configure CodeQL through GitHub Actions
+- [ ] Refresh the gh auth scope and resolve the MON-01 secret scanning result
+- [ ] Re-run collection and the gap assessment, and commit the before-and-after comparison as a follow-up to this lab
+
+---
+
+*Part of the [cloud-security-lab-notes](https://github.com/JNewbrey87/cloud-security-lab-notes) portfolio, building toward Cloud Security Analyst and the CySA+ / SC-200 / SC-500 certifications.*
