@@ -3,13 +3,13 @@
 **Project:** AEGIS (Adaptive Execution and Generative Intelligence System)  
 **Type:** Local inference debugging note  
 **Platform:** ASUS ROG Flow Z13 (ZX-A3G15): Ryzen AI Max+ 395, Radeon 8060S (gfx1151), 128 GB unified memory, Ollama on Windows  
-**Date:** September 2026  
+**Date:** September 2026
 
 ---
 
 ## Why I Did This One
 
-While setting up a clean benchmark run for the [evidence ledger](aegis-02-evidence-ledger.md), I checked `ollama ps` and found llama3.3:70b running at `100% CPU`. The server log agreed: `total_vram="0 B"` and an empty `GPULayers:[]`. A 43 GB model was running entirely on the processor, and had been for an unknown stretch of time. Nothing had ever errored. This machine has a capable integrated GPU and 128 GB of unified memory, and the same model had run on that GPU back in June and July, so this was close to the last thing I expected to find.
+While setting up a clean benchmark run for the [evidence ledger](02-AEGIS-Evidence-Ledger.md), I checked `ollama ps` and found llama3.3:70b running at `100% CPU`. The server log agreed: `total_vram="0 B"` and an empty `GPULayers:[]`. A 43 GB model was running entirely on the processor, and had been for an unknown stretch of time. Nothing had ever errored. This machine has a capable integrated GPU and 128 GB of unified memory, and the same model had run on that GPU back in June and July, so this was close to the last thing I expected to find.
 
 ## What I Tried: Six Wrong Guesses
 
@@ -73,9 +73,9 @@ I'm not leaning on speed numbers here. The runs during the fallback window were 
 
 ## What Came Next
 
-- With the GPU path restored, the final [evidence ledger](aegis-02-evidence-ledger.md) run finished in a few minutes on the GPU, the first run where I recorded a timing figure.
+- With the GPU path restored, the final [evidence ledger](02-AEGIS-Evidence-Ledger.md) run finished in a few minutes on the GPU, the first run where I recorded a timing figure.
 
-Back to the start: [aegis-00](aegis-00-poc-70b.md).
+Back to the start: [aegis-00](00-AEGIS-PoC-70b.md).
 
 ---
 
