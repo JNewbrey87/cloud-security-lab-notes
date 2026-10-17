@@ -1,10 +1,10 @@
 # Lab 1: Wazuh Agent Deployment and My First Detection Rule
 
 **Project:** P1, Wazuh SIEM Home Lab  
-**Phase:** 1a | **Platform:** Hyper-V on Windows 11 Pro (May 2026; the lab later moved to VirtualBox on new hardware)  
-**MITRE ATT&CK:** T1110 — Brute Force (Credential Access)  
+**Phase:** 1a | **Platform:** Hyper-V on Windows 11 Pro (the lab later moved to VirtualBox on new hardware)  
+**MITRE ATT&CK:** [T1110 — Brute Force](https://attack.mitre.org/techniques/T1110/)  
 **Cert Alignment:** CySA+ CS0-004, Domain 1 (Security Operations); SC-200  
-**Date Completed:** May 2026  
+**Date:** May 2026
 
 ---
 
@@ -13,8 +13,6 @@
 This was the first real lab in my homelab, and the point where it went from a few VMs to an actual security tool. Windows servers are part of my day job, and event logs aren't new to me. What I hadn't done was build the detection side myself: get an agent shipping Windows security events to a SIEM I set up, then write my own rule that fires on something real.
 
 I picked Windows Event ID 4625, failed logons, because it's about as basic as detections get, and I wanted to understand the whole pipeline end to end before trying anything fancier: audit policy, the Security log, the agent forwarding events, and the manager evaluating them against my rule.
-
----
 
 ## Architecture
 
@@ -33,8 +31,6 @@ I picked Windows Event ID 4625, failed logons, because it's about as basic as de
 | Default Switch (NAT, DHCP) | Internet access for apt and downloads | No; unstable across reboots |
 | Internal switch (static) | Agent-to-manager communication | Yes |
 
----
-
 ## What I Built
 
 ### 1. The Wazuh Manager
@@ -43,15 +39,19 @@ The all-in-one Wazuh installer wasn't viable on the hardware I had at the time; 
 
 ### 2. Enhanced Session Mode on the Ubuntu VM
 
-I wanted clipboard passthrough between my host and the Ubuntu VM, so I installed xrdp and the Hyper-V integration packages. On Ubuntu 22.04 those packages are `linux-tools-virtual` and `linux-cloud-tools-virtual`:
+I wanted clipboard passthrough between my host and the Ubuntu VM, so I installed xrdp and the Hyper-V integration packages. On Ubuntu 22.04 those packages are `linux-tools-virtual` and `linux-cloud-tools-virtual`. The name you'll often see suggested, `hyperv-daemons`, only exists on Fedora and RHEL-based distros, so it's not in the Ubuntu repos.
 
 ```bash
 # Ubuntu VM
 sudo apt install -y xrdp linux-tools-virtual linux-cloud-tools-virtual
+sudo systemctl enable xrdp
+sudo adduser xrdp ssl-cert
 
 # Host (elevated PowerShell)
 Set-VM -VMName "<ubuntu-vm-name>" -EnhancedSessionTransportType HvSocket
 ```
+
+After rebooting the Ubuntu VM, I closed the Hyper-V connection window and reconnected. A display resolution prompt confirmed Enhanced Session Mode was active.
 
 ### 3. Putting the Host on the Internal Switch
 
@@ -103,24 +103,26 @@ New-NetFirewallRule -DisplayName "Wazuh Agent - Auth (TCP 1515)" `
   -Direction Outbound -Protocol TCP -LocalPort 1515 -Action Allow -Profile Any
 ```
 
-Looking back, I'd write these with `-RemotePort` instead of `-LocalPort`. 1514 and 1515 are the ports on the manager's side, and the agent's own outbound port is random. Windows Firewall also allows outbound traffic by default, so these rules were more insurance than a requirement.
+A note on these: 1514 and 1515 are the ports on the manager's side, and the agent's own outbound port is random, so `-RemotePort` is the more precise way to scope rules like this. Windows Firewall also allows outbound traffic by default, so these rules are insurance rather than a requirement.
 
 ### 7. My First Custom Rule
 
 I wrote the rule in `/var/ossec/etc/rules/local_rules.xml` on the manager:
 
 ```xml
-<group name="local,">
+<group name="local,windows,authentication_failed,">
   <rule id="100002" level="10">
     <if_group>windows</if_group>
     <field name="win.system.eventID">^4625$</field>
-    <description>Custom: Windows failed logon attempt detected (Event 4625)</description>
+    <description>Windows failed logon detected (Event 4625)</description>
     <mitre>
       <id>T1110</id>
     </mitre>
   </rule>
 </group>
 ```
+
+This is the rule as I first wrote it. When I rebuilt the lab later, I standardized all my custom rules into one file with a "Custom:" prefix on each description; that version lives in [`detection-rules/local_rules.xml`](detection-rules/local_rules.xml).
 
 A few choices I made:
 
@@ -132,28 +134,31 @@ A few choices I made:
 sudo systemctl restart wazuh-manager
 ```
 
----
-
 ## What I Detected
 
-I generated a failed logon on purpose with a user that doesn't exist:
+I generated failed logons on purpose with a user that doesn't exist:
 
 ```powershell
-runas /user:fakeuser123 cmd
-# enter any password; it fails and writes Event 4625
+runas /user:nonexistentuser cmd
+# Enter any incorrect password when prompted; repeat 2-3 times
 ```
 
-Then I watched the alerts log on the manager:
+The alert showed up in `/var/ossec/logs/alerts/alerts.log` within seconds:
 
-```bash
-tail -f /var/ossec/logs/alerts/alerts.log | grep "100002"
+```
+Rule: 100002 (level 10) -> 'Windows failed logon detected (Event 4625)'
+
+win.system.eventID: 4625
+win.system.severityValue: AUDIT_FAILURE
+win.eventdata.targetUserName: nonexistentuser
+win.eventdata.status: 0xc000006d       # bad username or wrong password
+win.eventdata.logonType: 2             # interactive logon attempt
+win.eventdata.authenticationPackageName: Negotiate
 ```
 
-Rule 100002 fired on the very first try, with the MITRE T1110 tag attached. That confirmed the full pipeline: Windows Security log, agent, internal switch, manager, my rule, alert.
+That confirmed the full pipeline: Windows Security log, agent, internal switch, manager, my rule, alert.
 
----
-
-## What I Learned
+## What I Took Away
 
 **The networking problem looked like a Wazuh problem.** When the agent couldn't reach the manager, the errors made it look like a Wazuh configuration or authentication issue. The actual cause was the Default Switch putting my host and VM on different subnets after a reboot. Wazuh never even got a chance to fail. Basic connectivity is worth checking before blaming the application.
 
@@ -163,7 +168,7 @@ Rule 100002 fired on the very first try, with the MITRE T1110 tag attached. That
 
 **Don't run `apt full-upgrade` on a Hyper-V Kali VM.** I didn't need Kali for this lab, but I learned this one the hard way during the same session: a full upgrade replaced display components the Hyper-V framebuffer didn't like, and I got a black screen. Twice. `apt upgrade` only.
 
----
+**Hyper-V had its own learning curve.** Between the Default Switch subnet drift, the Kali black screen, and package names that don't carry over between Linux distros, my first couple of labs ran into a series of Hyper-V-specific issues. Those are a big part of why I later moved the whole lab to VirtualBox.
 
 ## Lab Environment
 
@@ -173,8 +178,6 @@ Rule 100002 fired on the very first try, with the MITRE T1110 tag attached. That
 | SIEM Manager | Ubuntu 22.04 LTS, Wazuh v4.14.5-1 (manager only; dashboard and indexer added after the hardware upgrade) |
 | Wazuh Agent | Windows 11 host, v4.14.5-1, agent ID 001 |
 | Network | Isolated internal Hyper-V switch, static IPs |
-
----
 
 ## What Came Next
 
@@ -186,4 +189,4 @@ Rule 100002 fired on the very first try, with the MITRE T1110 tag attached. That
 
 ---
 
-*Part of [cloud-security-lab-notes](https://github.com/JNewbrey87/cloud-security-lab-notes) | Joshua E. Newbrey | [LinkedIn](https://www.linkedin.com/in/jnewbrey87/) | [GitHub Profile](https://github.com/JNewbrey87)*
+*Part of the [cloud-security-lab-notes](https://github.com/JNewbrey87/cloud-security-lab-notes) portfolio, building toward Cloud Security Analyst and the CySA+ / SC-200 / SC-500 certifications.*
